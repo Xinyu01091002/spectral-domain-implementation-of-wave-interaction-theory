@@ -1,465 +1,422 @@
-function [coeffs] = coeffsMF12_superharmonic(order,g,h,a,b,kx,ky,Ux,Uy, dispCoeffs)
-% A modified version of coeffsMF12.
-% Originally designed for superharmonic (+++) interactions only.
-% Modified to include 2nd-order subharmonic (difference) interactions as well.
-% 3rd-order remains superharmonic (+++) only.
+function [coeffs] = coeffsMF12_superharmonic(order,g,h,a,b,kx,ky,Ux,Uy,dispCoeffs)
+%COEFFSMF12_SUPERHARMONIC MF12 coefficients with selective interaction retention.
+%   Keeps:
+%   - Second-order self, sum, and difference interactions.
+%   - Third-order first-order corrections (dispersion and potential corrections).
+%   - Third-order superharmonics only: (n+2m), (2n+m), and (n+m+p).
 %
-% Based on coeffsMF12.m by David R. Fuhrman.
+%   Inputs match coeffsMF12.
 
-% Set (optional) default argument dispCoeffs to 0 (false)
-if nargin < 10, dispCoeffs = 0; end
-
-% Initialize
-muStar = 0*a; 
-
-% Basic derived input
-N = length(a); % Number of components
-kappa = sqrt(kx.^2 + ky.^2); % Eq. 3.4
-omega1 = sqrt(g*kappa.*tanh(h*kappa)); % Eq. 3.5b
-omega = kx*Ux + ky*Uy + omega1; % Eq. 3.5a
-F = -omega1./(kappa.*sinh(h*kappa)); % Eq. 3.6
-mu = F.*cosh(h*kappa); % Eq. 3.77
-kappa_2 = 2*kappa; % Eq. 3.13
-kx_2 = 2*kx; ky_2 = 2*ky;
-c = sqrt(a.^2 + b.^2); % p. 316, just after Eq. 3.66
-
-
-% Second-order self-interaction coefficients (Superharmonic)
-if order >= 2
-    G_2 = 1/2*h*kappa.*(2 + cosh(2*h*kappa)).*coth(h*kappa)./(sinh(h*kappa).^2); % Eq. 3.26a
-    F_2 = -3/4*h*omega1./(sinh(h*kappa).^4); % Eq. 3.26b
+if nargin < 10
+    dispCoeffs = 0;
 end
 
-% Second order (Only Sum Interactions)
+% Ensure row vectors for consistent indexing/storage.
+a = a(:).';
+b = b(:).';
+kx = kx(:).';
+ky = ky(:).';
+
+N = numel(a);
+muStar = zeros(1,N);
+
+% Linear quantities
+kappa = sqrt(kx.^2 + ky.^2);                 % Eq. 3.4
+omega1 = sqrt(g*kappa.*tanh(h*kappa));       % Eq. 3.5b
+omega = kx*Ux + ky*Uy + omega1;              % Eq. 3.5a
+F = -omega1./(kappa.*sinh(h*kappa));         % Eq. 3.6
+mu = F.*cosh(h*kappa);                       % Eq. 3.77
+kappa_2 = 2*kappa;
+kx_2 = 2*kx;
+ky_2 = 2*ky;
+c = sqrt(a.^2 + b.^2);
+
+% Second-order self terms
 if order >= 2
-    % Self-self interactions (2*omega is superharmonic)
-    % A_2, B_2 are difference (mean) terms -> Omitted
-    mu_2 = F_2.*cosh(h*kappa_2) - h*omega1; % Eq. 3.79 (Keep, 2*omega term)
-    
-    % Mass flux coefficient (difference term) -> Omitted M
-    
-    % Sum interactions ONLY (n+m)
-    cnm = 0; % Double-summation counter
-    num_pairs = N*(N-1);
-    
-    % Pre-allocate for speed (optional but good practice)
-    omega_npm = zeros(1, num_pairs);
-    kx_npm = zeros(1, num_pairs); ky_npm = zeros(1, num_pairs);
-    kappa_npm = zeros(1, num_pairs); alpha_npm = zeros(1, num_pairs);
-    gamma_npm = zeros(1, num_pairs); beta_npm = zeros(1, num_pairs);
-    F_npm = zeros(1, num_pairs); G_npm = zeros(1, num_pairs);
-    mu_npm = zeros(1, num_pairs);
-    
+    G_2 = 0.5*h*kappa.*(2 + cosh(2*h*kappa)).*coth(h*kappa)./(sinh(h*kappa).^2); % Eq. 3.26a
+    F_2 = -0.75*h*omega1./(sinh(h*kappa).^4);                                     % Eq. 3.26b
+    A_2 = (a.^2 - b.^2)/(2*h);                                                    % Eq. 3.11
+    B_2 = (a.*b)/h;                                                                % Eq. 3.11
+    mu_2 = F_2.*cosh(h*kappa_2) - h*omega1;                                       % Eq. 3.79
+
+    % Mass flux coefficient (kept for compatibility with full coeffsMF12 outputs)
+    M = c.^2.*omega1./(2*kappa).*coth(h*kappa);                                   % Eq. 3.70 factor
+
+    % Second-order pair interactions: keep both n+m and n-m
+    numPairs = N*(N-1)/2;
+    len2 = 2*numPairs;
+
+    omega_npm = zeros(1,len2);
+    kx_npm = zeros(1,len2); ky_npm = zeros(1,len2);
+    kappa_npm = zeros(1,len2);
+    alpha_npm = zeros(1,len2);
+    gamma_npm = zeros(1,len2);
+    beta_npm = zeros(1,len2);
+    F_npm = zeros(1,len2);
+    G_npm = zeros(1,len2);
+    mu_npm = zeros(1,len2);
+    A_npm = zeros(1,len2);
+    B_npm = zeros(1,len2);
+
+    pairCount = 0;
     for n = 1:N
-        for m = n+1:N
-            for pm = [1 -1] % Sum and Difference
-                cnm = cnm + 1; % Update counter 
+        for m = (n+1):N
+            pairCount = pairCount + 1;
+            idxPlus = 2*pairCount - 1;
+            idxMinus = idxPlus + 1;
 
-                % Transfer functions
-                omega_npm(cnm) = omega1(n) + pm*omega1(m); % Eq. 3.14                
-                kx_npm(cnm) = kx(n)+pm*kx(m); ky_npm(cnm) = ky(n)+pm*ky(m);
-                kappa_npm(cnm) = sqrt(kx_npm(cnm)^2 + ky_npm(cnm)^2); % Eq. 3.12
-                alpha_npm(cnm) = omega_npm(cnm)*cosh(h*kappa_npm(cnm)); % Eq. 3.15
-                gamma_npm(cnm) = kappa_npm(cnm)*sinh(h*kappa_npm(cnm)); % Eq. 3.16
-                beta_npm(cnm) = omega_npm(cnm)^2*cosh(h*kappa_npm(cnm)) - g*kappa_npm(cnm)*sinh(h*kappa_npm(cnm)); % Eq. 3.17
-                F_npm(cnm) = Gamma2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                    omega_npm(cnm),beta_npm(cnm), g,h); % Eq. 3.21
-                G_npm(cnm) = Lambda2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                    omega_npm(cnm),alpha_npm(cnm),gamma_npm(cnm),beta_npm(cnm), g,h); % Eq. 3.19
-                mu_npm(cnm) = F_npm(cnm)*cosh(h*kappa_npm(cnm)) - h/2*(omega1(n) + pm*omega1(m)); % Eq. 3.78
-            end
-        end 
-    end 
-end 
+            [omega_npm(idxPlus), kx_npm(idxPlus), ky_npm(idxPlus), kappa_npm(idxPlus), ...
+                alpha_npm(idxPlus), gamma_npm(idxPlus), beta_npm(idxPlus), ...
+                F_npm(idxPlus), G_npm(idxPlus), mu_npm(idxPlus)] = pair_terms(1,n,m);
 
-% Third order (Only Superharmonic +++)
+            [omega_npm(idxMinus), kx_npm(idxMinus), ky_npm(idxMinus), kappa_npm(idxMinus), ...
+                alpha_npm(idxMinus), gamma_npm(idxMinus), beta_npm(idxMinus), ...
+                F_npm(idxMinus), G_npm(idxMinus), mu_npm(idxMinus)] = pair_terms(-1,n,m);
+
+            A_npm(idxPlus) = (a(n)*a(m) - b(n)*b(m))/h;    % Eq. 3.10a, pm=+1
+            B_npm(idxPlus) = (a(m)*b(n) + a(n)*b(m))/h;    % Eq. 3.10b, pm=+1
+            A_npm(idxMinus) = (a(n)*a(m) + b(n)*b(m))/h;   % Eq. 3.10a, pm=-1
+            B_npm(idxMinus) = (a(m)*b(n) - a(n)*b(m))/h;   % Eq. 3.10b, pm=-1
+        end
+    end
+end
+
+% Third-order terms
 if order == 3
-    % Single summations & Dispersion Correction
-    % Note: Even though this is "Superharmonic" file, these corrections to linear dispersion
-    % are CRITICAL for correct phase speeds of the primary waves.
-    Upsilon = omega1.*kappa.*(-13 + 24*cosh(2*h*kappa) + cosh(4*h*kappa))./(64*sinh(h*kappa).^5); 
-    Xi = 1/(4*h).*(omega1.*G_2 + F_2.*kappa_2.*sinh(h*kappa_2) - g*h*kappa.^2./(2*omega1)); 
-    F13 = c.^2.*Upsilon; 
-    muStar = c.^2.*Xi; 
-    Omega = (8 + cosh(4*h*kappa))./(16*sinh(h*kappa).^4); 
-    omega3 = c.^2.*kappa.^2.*Omega; 
-    
-    % Loop for O(N^2) mutual interactions (Dispersion Correction)
-    % This part calculates changes to fundamental frequency due to interactions
+    % Third-order corrections to first-order quantities.
+    Upsilon = omega1.*kappa.*(-13 + 24*cosh(2*h*kappa) + cosh(4*h*kappa))./(64*sinh(h*kappa).^5); % Eq. 3.67
+    Xi = (omega1.*G_2 + F_2.*kappa_2.*sinh(h*kappa_2) - g*h*kappa.^2./(2*omega1))/(4*h);           % Eq. 3.85
+    F13 = c.^2.*Upsilon;                                                                             % Eq. 3.66 (part)
+    muStar = c.^2.*Xi;                                                                               % Eq. 3.84 (part)
+    Omega = (8 + cosh(4*h*kappa))./(16*sinh(h*kappa).^4);                                           % Eq. 3.74
+    omega3 = c.^2.*kappa.^2.*Omega;                                                                  % Eq. 3.73 (part)
+
     for n = 1:N
-        for m = [1:n-1 n+1:N] 
-            % Sum interactions (n+m)
-            pm = 1; 
-            omega_npm_local = omega1(n) + pm*omega1(m); 
-            kappa_npm_local = sqrt((kx(n)+pm*kx(m))^2 + (ky(n)+pm*ky(m))^2);
-            alpha_npm_local = omega_npm_local*cosh(h*kappa_npm_local); 
-            gamma_npm_local = kappa_npm_local*sinh(h*kappa_npm_local); 
-            beta_npm_local = omega_npm_local^2*cosh(h*kappa_npm_local) - g*kappa_npm_local*sinh(h*kappa_npm_local); 
-            G_npm_local = Lambda2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                    omega_npm_local,alpha_npm_local,gamma_npm_local,beta_npm_local, g,h); 
-            F_npm_local = Gamma2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                    omega_npm_local,beta_npm_local, g,h); 
+        for m = [1:n-1, n+1:N]
+            % + interaction
+            [omega_np, kx_np, ky_np, kappa_np, alpha_np, gamma_np, beta_np, F_np, G_np, ~] = pair_terms(1,n,m);
+            % - interaction
+            [omega_nm, kx_nm, ky_nm, kappa_nm, alpha_nm, gamma_nm, beta_nm, F_nm, G_nm, ~] = pair_terms(-1,n,m);
 
-            % Difference interactions (n-m)
-            pm = -1; 
-            omega_nmm_local = omega1(n) + pm*omega1(m); 
-            kappa_nmm_local = sqrt((kx(n)+pm*kx(m))^2 + (ky(n)+pm*ky(m))^2); 
-            alpha_nmm_local = omega_nmm_local*cosh(h*kappa_nmm_local); 
-            gamma_nmm_local = kappa_nmm_local*sinh(h*kappa_nmm_local); 
-            beta_nmm_local = omega_nmm_local^2*cosh(h*kappa_nmm_local) - g*kappa_nmm_local*sinh(h*kappa_nmm_local); 
-            G_nmm_local = Lambda2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                    omega_nmm_local,alpha_nmm_local,gamma_nmm_local,beta_nmm_local, g,h); 
-            F_nmm_local = Gamma2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                    omega_nmm_local,beta_nmm_local, g,h); 
-            
-            % Accumulate corrections
-            Ups_nm_val = Upsilon_nm(omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), ...
-                F_npm_local,F_nmm_local,G_npm_local,G_nmm_local, kappa_npm_local,kappa_nmm_local, g,h);
-            XI_nm_val = Xi_nm(omega1(n),kappa(n), omega1(m), G_npm_local,F_npm_local,gamma_npm_local, ...
-                G_nmm_local,F_nmm_local,gamma_nmm_local, h,g);
-            Om_nm_val = Omega_nm(omega1(n),kx(n),ky(n), omega1(m),kx(m),ky(m),kappa(m), ...
-                F_npm_local,F_nmm_local,G_npm_local,G_nmm_local, kappa_npm_local,kappa_nmm_local, g,h);
-            
-            F13(n) = F13(n) + c(m)^2*Ups_nm_val;
-            muStar(n) = muStar(n) + c(m)^2*XI_nm_val; 
-            omega3(n) = omega3(n) + c(m)^2*kappa(m)^2*Om_nm_val; 
+            ups = Upsilon_nm(omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), ...
+                F_np,F_nm,G_np,G_nm, kappa_np,kappa_nm, g,h);
+            xi = Xi_nm(omega1(n),kappa(n), omega1(m), G_np,F_np,gamma_np, G_nm,F_nm,gamma_nm, h,g);
+            om = Omega_nm(omega1(n),kx(n),ky(n), omega1(m),kx(m),ky(m),kappa(m), F_np,F_nm,G_np,G_nm, kappa_np,kappa_nm, g,h);
+
+            F13(n) = F13(n) + c(m)^2*ups;
+            muStar(n) = muStar(n) + c(m)^2*xi;
+            omega3(n) = omega3(n) + c(m)^2*kappa(m)^2*om;
 
         end
     end
-    omega = omega + omega3.*omega1; 
-    muStar = muStar + F13.*cosh(h*kappa); 
 
-    
-    % Double summations (n+2m, 2n+m)
-    cnm = 0; 
-    % Pre-allocate
-    % ... (skipping pre-allocation for brevity in this snippet, MATLAB JIT handles it reasonably well)
-    
-    for n = 1:N 
-        for m = n+1:N
-            % for pm = [1 -1] -> Only pm = 1
-            pm = 1;
-            cnm = cnm + 1; 
-            
-            % Transfer functions, n+2m
-            % pm=1 implies n+2m (Superharmonic)
-            omega_np2m(cnm) = omega1(n) + pm*2*omega1(m); 
-            kx_np2m(cnm) = kx(n) + pm*2*kx(m); ky_np2m(cnm) = ky(n) + pm*2*ky(m);
-            kappa_np2m(cnm) = sqrt(kx_np2m(cnm)^2 + ky_np2m(cnm)^2); 
-            alpha_np2m(cnm) = omega_np2m(cnm)*cosh(h*kappa_np2m(cnm)); 
-            gamma_np2m(cnm) = kappa_np2m(cnm)*sinh(h*kappa_np2m(cnm)); 
-            beta_np2m(cnm) = omega_np2m(cnm)^2*cosh(h*kappa_np2m(cnm)) - g*kappa_np2m(cnm)*sinh(h*kappa_np2m(cnm)); 
-            
-            % Note: In original code, indices were based on mixed sum/diff array. 
-            % Here cnm corresponds directly to n+m sum index in the reduced array.
-            % We use: kappa_npm(cnm), G_npm(cnm) which are the Sum (+) vars.
-            gamma_2_m = 2*kappa(m)*sinh(h*2*kappa(m)); % Recalc local gamma_2 for m
+    omega = omega + omega3.*omega1;              % Eq. 3.72
+    muStar = muStar + F13.*cosh(h*kappa);        % Eq. 3.84 correction
 
-            G_np2m(cnm) = Lambda3(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                   kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), kappa_2(m),gamma_2_m,G_2(m),pm*F_2(m), ...
-                   omega_np2m(cnm),alpha_np2m(cnm),gamma_np2m(cnm),beta_np2m(cnm), g,h); 
-            F_np2m(cnm) = Gamma3(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                   kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), kappa_2(m),gamma_2_m,G_2(m),pm*F_2(m), ...
-                   omega_np2m(cnm),beta_np2m(cnm), g,h); 
-            mu_np2m(cnm) = Pi(omega1(n),kappa(n), pm*omega1(m),kappa(m), pm*omega1(m),kappa(m), ...
-                    gamma_npm(cnm),G_npm(cnm),F_npm(cnm), gamma_npm(cnm),G_npm(cnm),F_npm(cnm), gamma_2_m,G_2(m),pm*F_2(m), F_np2m(cnm),kappa_np2m(cnm), g,h);
-                
-            % Transfer functions, 2n+m 
-            omega_2npm(cnm) = 2*omega1(n) + pm*omega1(m); 
-            kx_2npm(cnm) = 2*kx(n) + pm*kx(m); ky_2npm(cnm) = 2*ky(n) + pm*ky(m);
-            kappa_2npm(cnm) = sqrt(kx_2npm(cnm)^2 + ky_2npm(cnm)^2); 
-            alpha_2npm(cnm) = omega_2npm(cnm)*cosh(h*kappa_2npm(cnm)); 
-            gamma_2npm(cnm) = kappa_2npm(cnm)*sinh(h*kappa_2npm(cnm)); 
-            beta_2npm(cnm) = omega_2npm(cnm)^2*cosh(h*kappa_2npm(cnm)) - g*kappa_2npm(cnm)*sinh(h*kappa_2npm(cnm)); 
-            
-            gamma_2_n = 2*kappa(n)*sinh(h*2*kappa(n)); % Recalc local gamma_2 for n
-            
-            G_2npm(cnm) = Lambda3(omega1(n),kx(n),ky(n),kappa(n), omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                   kappa_2(n),gamma_2_n,G_2(n),F_2(n), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), ...
-                   omega_2npm(cnm),alpha_2npm(cnm),gamma_2npm(cnm),beta_2npm(cnm), g,h);    
-            F_2npm(cnm) = Gamma3(omega1(n),kx(n),ky(n),kappa(n), omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
-                   kappa_2(n),gamma_2_n,G_2(n),F_2(n), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), ...
-                   omega_2npm(cnm),beta_2npm(cnm), g,h);
-            mu_2npm(cnm) = Pi(omega1(n),kappa(n), omega1(n),kappa(n), pm*omega1(m),kappa(m), ...
-                    gamma_2_n,G_2(n),F_2(n), gamma_npm(cnm),G_npm(cnm),F_npm(cnm), gamma_npm(cnm),G_npm(cnm),F_npm(cnm), F_2npm(cnm),kappa_2npm(cnm), g,h);
+    % Third-order single summations (self-self-self harmonic)
+    kappa_3 = 3*kappa;
+    gamma_2 = kappa_2.*sinh(h*kappa_2);
+
+    A_3 = zeros(1,N);
+    B_3 = zeros(1,N);
+    F_3 = zeros(1,N);
+    G_3 = zeros(1,N);
+    mu_3 = zeros(1,N);
+
+    for n = 1:N
+        A_3(n) = 0.5*ThetaA(a(n),b(n), a(n),b(n), a(n),b(n), h); % Eq. 3.38
+        B_3(n) = 0.5*ThetaB(a(n),b(n), a(n),b(n), a(n),b(n), h); % Eq. 3.39
+        F_3(n) = (h^2*kappa(n)*omega1(n)/(32*sinh(h*kappa(n))^7))*(-11 + 2*cosh(2*h*kappa(n))); % Eq. 3.65
+        G_3(n) = (3*h^2*kappa(n)^2/(128*sinh(h*kappa(n))^6))*(14 + 15*cosh(2*h*kappa(n)) + 6*cosh(4*h*kappa(n)) + cosh(6*h*kappa(n))); % Eq. 3.64
+        mu_3(n) = F_3(n)*cosh(h*kappa_3(n)) - g*h^2*kappa(n)^2/(4*omega1(n)) + 0.5*h*(F_2(n)*gamma_2(n) - omega1(n)*G_2(n)); % Eq. 3.80
+    end
+
+    % Two pair-index maps are needed to mirror coeffsMF12 indexing:
+    % 1) Row-wise odd map: matches cnm index for pmm=+1 in triple loops.
+    M_nm_row_odd = zeros(N);
+    pairCount = 0;
+    for n = 1:N
+        for m = (n+1):N
+            pairCount = pairCount + 1;
+            M_nm_row_odd(n,m) = 2*pairCount - 1;
         end
-    end 
-    
-    % Triple summations
-    
-    % Build matrix for sum indices
-    M_nm = zeros(N); 
-    nm_indices = 1:N*(N-1)/2;
-    M_nm(triu(ones(N),1)==1) = nm_indices; 
-    % M_nm NOW contains directly the index for (n+m) in our reduced arrays.
-    % No need for (2*M_nm - 1).
-    
-    % Pre-allocate per-iteration arrays for speed
-    
-    % --- PROGRESS BAR SETUP ---
-    total_iterations_3 = N*(N-1)*(N-2)/6;
-    check_interval = max(1, round(total_iterations_3 / 20)); % Update every 5%
-    start_time = tic;
-    % --------------------------
+    end
+    % 2) Column-major odd map: matches M_nm constructed in coeffsMF12.
+    M_nm_col_odd = zeros(N);
+    nm_indices = 1:(N*(N-1)/2);
+    M_nm_col_odd(triu(ones(N),1)==1) = nm_indices;
+    M_nm_col_odd = 2*M_nm_col_odd - 1;
 
-    cnm = 0; c3 = 0; 
-    for n = 1:N 
-        for m = n+1:N
-            % pmm = 1 (Only +m)
-            pmm = 1;
-            cnm = cnm + 1; % Matches cnm in Double summation (n,m)
-            
-            for p = m+1:N
-                % pmp = 1 (Only +p)
-                pmp = 1;
-                c3 = c3 + 1; 
+    numPairs = N*(N-1)/2;
+    omega_np2m = zeros(1,numPairs);
+    kx_np2m = zeros(1,numPairs); ky_np2m = zeros(1,numPairs);
+    kappa_np2m = zeros(1,numPairs); alpha_np2m = zeros(1,numPairs);
+    gamma_np2m = zeros(1,numPairs); beta_np2m = zeros(1,numPairs);
+    F_np2m = zeros(1,numPairs); G_np2m = zeros(1,numPairs); mu_np2m = zeros(1,numPairs);
+    A_np2m = zeros(1,numPairs); B_np2m = zeros(1,numPairs);
 
-                % --- PROGRESS UPDATE ---
-                if mod(c3, check_interval) == 0
-                    elapsed_time = toc(start_time);
-                    progress_frac = c3 / total_iterations_3;
-                    estimated_total = elapsed_time / progress_frac;
-                    remaining_time = estimated_total - elapsed_time;
-                    
-                    fprintf('Order 3 Progress: %.1f%% | Elapsed: %.1fs | ETA: %.1fs\n', ...
-                        progress_frac * 100, elapsed_time, remaining_time);
-                end
-                % -----------------------
-                
-                % (n + m + p) coefficients
-                omega_npmpp(c3) = omega1(n) + pmm*omega1(m) + pmp*omega1(p); 
-                kx_npmpp(c3) = kx(n) + pmm*kx(m) + pmp*kx(p); ky_npmpp(c3) = ky(n) + pmm*ky(m) + pmp*ky(p);
-                kappa_npmpp(c3) = sqrt(kx_npmpp(c3)^2 + ky_npmpp(c3)^2); 
-                alpha_npmpp(c3) = omega_npmpp(c3)*cosh(h*kappa_npmpp(c3)); 
-                beta_npmpp(c3) = omega_npmpp(c3)^2*cosh(h*kappa_npmpp(c3)) - g*kappa_npmpp(c3)*sinh(h*kappa_npmpp(c3)); 
-                gamma_npmpp(c3) = kappa_npmpp(c3)*sinh(h*kappa_npmpp(c3)); 
-                
-                % Indices for (n+p) and (m+p)
-                cnp = M_nm(n,p); 
-                cmp = M_nm(m,p); 
-                % No adjustments needed for difference terms since we always have +p here.
-                
-                % Transfer functions
-                % Inputs need G_npm(cnm), G_npp(cnp), G_mpp(cmp) etc. (All Sums)
-                
-                G_npmpp(c3) = Lambda3(omega1(n),kx(n),ky(n),kappa(n), pmm*omega1(m),pmm*kx(m),pmm*ky(m),kappa(m), ...
-                    pmp*omega1(p),pmp*kx(p),pmp*ky(p),kappa(p), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), ...
-                    kappa_npm(cnp),gamma_npm(cnp),G_npm(cnp),F_npm(cnp), kappa_npm(cmp),gamma_npm(cmp),G_npm(cmp),pmm*F_npm(cmp), ...
+    omega_2npm = zeros(1,numPairs);
+    kx_2npm = zeros(1,numPairs); ky_2npm = zeros(1,numPairs);
+    kappa_2npm = zeros(1,numPairs); alpha_2npm = zeros(1,numPairs);
+    gamma_2npm = zeros(1,numPairs); beta_2npm = zeros(1,numPairs);
+    F_2npm = zeros(1,numPairs); G_2npm = zeros(1,numPairs); mu_2npm = zeros(1,numPairs);
+    A_2npm = zeros(1,numPairs); B_2npm = zeros(1,numPairs);
+
+    pairCount = 0;
+    for n = 1:N
+        for m = (n+1):N
+            pairCount = pairCount + 1;
+            idxSum_nm = 2*pairCount - 1; % n+m entry in second-order arrays
+
+            % n+2m
+            omega_np2m(pairCount) = omega1(n) + 2*omega1(m);                    % Eq. 3.44b (pm=+1)
+            kx_np2m(pairCount) = kx(n) + 2*kx(m);
+            ky_np2m(pairCount) = ky(n) + 2*ky(m);
+            kappa_np2m(pairCount) = hypot(kx_np2m(pairCount), ky_np2m(pairCount));
+            alpha_np2m(pairCount) = omega_np2m(pairCount)*cosh(h*kappa_np2m(pairCount));
+            gamma_np2m(pairCount) = kappa_np2m(pairCount)*sinh(h*kappa_np2m(pairCount));
+            beta_np2m(pairCount) = omega_np2m(pairCount)^2*cosh(h*kappa_np2m(pairCount)) - g*kappa_np2m(pairCount)*sinh(h*kappa_np2m(pairCount));
+
+            A_np2m(pairCount) = 0.5*ThetaA(a(n),b(n), a(m),b(m), a(m),b(m), h);  % Eq. 3.36, pm=+1
+            B_np2m(pairCount) = 0.5*ThetaB(a(n),b(n), a(m),b(m), a(m),b(m), h);
+
+            G_np2m(pairCount) = Lambda3(omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), omega1(m),kx(m),ky(m),kappa(m), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                kappa_2(m),gamma_2(m),G_2(m),F_2(m), ...
+                omega_np2m(pairCount),alpha_np2m(pairCount),gamma_np2m(pairCount),beta_np2m(pairCount), g,h);
+
+            F_np2m(pairCount) = Gamma3(omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), omega1(m),kx(m),ky(m),kappa(m), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                kappa_2(m),gamma_2(m),G_2(m),F_2(m), ...
+                omega_np2m(pairCount),beta_np2m(pairCount), g,h);
+
+            mu_np2m(pairCount) = Pi(omega1(n),kappa(n), omega1(m),kappa(m), omega1(m),kappa(m), ...
+                gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                gamma_2(m),G_2(m),F_2(m), F_np2m(pairCount),kappa_np2m(pairCount), g,h);
+
+            % 2n+m
+            omega_2npm(pairCount) = 2*omega1(n) + omega1(m);                    % Eq. 3.44c (pm=+1)
+            kx_2npm(pairCount) = 2*kx(n) + kx(m);
+            ky_2npm(pairCount) = 2*ky(n) + ky(m);
+            kappa_2npm(pairCount) = hypot(kx_2npm(pairCount), ky_2npm(pairCount));
+            alpha_2npm(pairCount) = omega_2npm(pairCount)*cosh(h*kappa_2npm(pairCount));
+            gamma_2npm(pairCount) = kappa_2npm(pairCount)*sinh(h*kappa_2npm(pairCount));
+            beta_2npm(pairCount) = omega_2npm(pairCount)^2*cosh(h*kappa_2npm(pairCount)) - g*kappa_2npm(pairCount)*sinh(h*kappa_2npm(pairCount));
+
+            A_2npm(pairCount) = 0.5*ThetaA(a(n),b(n), a(n),b(n), a(m),b(m), h);  % From Eq. 3.32/3.34
+            B_2npm(pairCount) = 0.5*ThetaB(a(n),b(n), a(n),b(n), a(m),b(m), h);  % From Eq. 3.33/3.35
+
+            G_2npm(pairCount) = Lambda3(omega1(n),kx(n),ky(n),kappa(n), omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), ...
+                kappa_2(n),gamma_2(n),G_2(n),F_2(n), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                omega_2npm(pairCount),alpha_2npm(pairCount),gamma_2npm(pairCount),beta_2npm(pairCount), g,h);
+
+            F_2npm(pairCount) = Gamma3(omega1(n),kx(n),ky(n),kappa(n), omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), ...
+                kappa_2(n),gamma_2(n),G_2(n),F_2(n), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                omega_2npm(pairCount),beta_2npm(pairCount), g,h);
+
+            mu_2npm(pairCount) = Pi(omega1(n),kappa(n), omega1(n),kappa(n), omega1(m),kappa(m), ...
+                gamma_2(n),G_2(n),F_2(n), ...
+                gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                F_2npm(pairCount),kappa_2npm(pairCount), g,h);
+        end
+    end
+
+    % Triple summations: superharmonic n+m+p only
+    numTriplets = N*(N-1)*(N-2)/6;
+    omega_npmpp = zeros(1,numTriplets);
+    kx_npmpp = zeros(1,numTriplets); ky_npmpp = zeros(1,numTriplets);
+    kappa_npmpp = zeros(1,numTriplets);
+    alpha_npmpp = zeros(1,numTriplets);
+    beta_npmpp = zeros(1,numTriplets);
+    gamma_npmpp = zeros(1,numTriplets);
+    F_npmpp = zeros(1,numTriplets);
+    G_npmpp = zeros(1,numTriplets);
+    mu_npmpp = zeros(1,numTriplets);
+    A_npmpp = zeros(1,numTriplets);
+    B_npmpp = zeros(1,numTriplets);
+
+    c3 = 0;
+    for n = 1:N
+        for m = (n+1):N
+            idxSum_nm = M_nm_row_odd(n,m);
+            for p = (m+1):N
+                c3 = c3 + 1;
+                idxSum_np = M_nm_col_odd(n,p);
+                idxSum_mp = M_nm_col_odd(m,p);
+
+                omega_npmpp(c3) = omega1(n) + omega1(m) + omega1(p);            % Eq. 3.44a, +++
+                kx_npmpp(c3) = kx(n) + kx(m) + kx(p);
+                ky_npmpp(c3) = ky(n) + ky(m) + ky(p);
+                kappa_npmpp(c3) = hypot(kx_npmpp(c3), ky_npmpp(c3));
+                alpha_npmpp(c3) = omega_npmpp(c3)*cosh(h*kappa_npmpp(c3));
+                beta_npmpp(c3) = omega_npmpp(c3)^2*cosh(h*kappa_npmpp(c3)) - g*kappa_npmpp(c3)*sinh(h*kappa_npmpp(c3));
+                gamma_npmpp(c3) = kappa_npmpp(c3)*sinh(h*kappa_npmpp(c3));
+
+                A_npmpp(c3) = 0.5*ThetaA(a(n),b(n), a(m),b(m), a(p),b(p), h);
+                B_npmpp(c3) = 0.5*ThetaB(a(n),b(n), a(m),b(m), a(p),b(p), h);
+
+                G_npmpp(c3) = Lambda3(omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), omega1(p),kx(p),ky(p),kappa(p), ...
+                    kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                    kappa_npm(idxSum_np),gamma_npm(idxSum_np),G_npm(idxSum_np),F_npm(idxSum_np), ...
+                    kappa_npm(idxSum_mp),gamma_npm(idxSum_mp),G_npm(idxSum_mp),F_npm(idxSum_mp), ...
                     omega_npmpp(c3),alpha_npmpp(c3),gamma_npmpp(c3),beta_npmpp(c3), g,h);
-                F_npmpp(c3) = Gamma3(omega1(n),kx(n),ky(n),kappa(n), pmm*omega1(m),pmm*kx(m),pmm*ky(m),kappa(m), ...
-                    pmp*omega1(p),pmp*kx(p),pmp*ky(p),kappa(p), kappa_npm(cnm),gamma_npm(cnm),G_npm(cnm),F_npm(cnm), ...
-                    kappa_npm(cnp),gamma_npm(cnp),G_npm(cnp),F_npm(cnp), kappa_npm(cmp),gamma_npm(cmp),G_npm(cmp),pmm*F_npm(cmp), ...
-                    omega_npmpp(c3),beta_npmpp(c3), g,h);
-                mu_npmpp(c3) = Pi(omega1(n),kappa(n), pmm*omega1(m),kappa(m), ...
-                    pmp*omega1(p),kappa(p), ...
-                    gamma_npm(cnm),G_npm(cnm),F_npm(cnm), gamma_npm(cnp),G_npm(cnp),F_npm(cnp), ...
-                    gamma_npm(cmp),G_npm(cmp),pmm*F_npm(cmp), F_npmpp(c3),kappa_npmpp(c3), g,h);
-            end 
-        end
-    end
-end 
 
-%%% Save coefficients for output
-coeffs.g = g; coeffs.h = h; coeffs.N = N;
-coeffs.a = a; coeffs.b = b; coeffs.kx = kx; coeffs.ky = ky;
-coeffs.Ux = Ux; coeffs.Uy = Uy;
-coeffs.kappa = kappa; coeffs.omega1 = omega1; coeffs.omega = omega;
-coeffs.mu = mu; coeffs.muStar = muStar; coeffs.F = F; coeffs.c = c; coeffs.kappa_2 = kappa_2;
-if order >= 2 
-    coeffs.F_2 = F_2; coeffs.G_2 = G_2; coeffs.mu_2 = mu_2;
-    % Add A_2 and B_2 for self-self interactions (using superharmonic definition)
-    % For superharmonics (2*theta_n), the amplitude coeffs are typically derived from
-    % squaring the linear signal.
-    % A_2 = 1/(2h)*(a^2 - b^2); B_2 = 1/h*(a*b); <-- This is Eq 3.11 for difference terms?
-    % Wait, Eq 3.7a: sum G_2 [ A_2 cos(2th) + B_2 sin(2th) ]
-    % Let's check MF12 paper for Eq 3.7a definition.
-    % Usually A_2n = (a_n^2 - b_n^2)/(2h) is for mean/diff? No.
-    % Let's look at standard expansion: (a cos + b sin)^2 = a^2 cos^2 + b^2 sin^2 + 2ab sin cos
-    % = a^2(1+cos2)/2 + b^2(1-cos2)/2 + ab sin2
-    % = (a^2+b^2)/2 + (a^2-b^2)/2 cos2 + ab sin2.
-    % So coefficient for cos(2theta) is (a^2-b^2)/2. Coefficient for sin(2theta) is ab.
-    % In MF12, A_2n and B_2n are defined in Eq 3.11 (referenced in original code).
-    % Original code (commented out in your version or missing?):
-    % A_2 = 1/(2*h)*(a.^2 - b.^2); B_2 = 1/h*(a.*b); 
-    % Wait, the 1/h factor comes from the perturbation expansion scaling?
-    % Let's re-add them based on typical HOS/MF12 structure.
-    coeffs.A_2 = 1/2*(a.^2 - b.^2); % Note: removed 1/h based on derivation above if G_2 handles scaling?
-    % Original code had: A_2 = 1/(2*h)*(a.^2 - b.^2). 
-    % Let's stick to consistent definition with original code assuming G_2 expects it.
-    % Re-reading original coeffsMF12.m lines 95:
-    % A_2 = 1/(2*h)*(a.^2 - b.^2); B_2 = 1/h*(a.*b);
-    coeffs.A_2 = 1/(2*h)*(a.^2 - b.^2); 
-    coeffs.B_2 = 1/h*(a.*b);
-    
-    coeffs.F_npm = F_npm; coeffs.G_npm = G_npm; 
-    
-    % Calculates A_npm and B_npm for output
-    % Need to re-calculate vector form or store them during loop
-    % In loop: A_npm(cnm) = 1/h*(...); B_npm(cnm) = ...
-    % Since we didn't store them in the simplified loop, we should add them now.
-    % Sum interactions (pm=1):
-    % A_npm = 1/h*(a(n)a(m) - b(n)b(m));
-    % B_npm = 1/h*(a(m)b(n) + a(n)b(m));
-    
-    % Let's reconstruct them vectorially to avoid loop
-    % We need indices.
-    % Re-run loop logic or better, just compute efficiently?
-    % Since we need to return them in struct, and surface_spectral needs them.
-    
-    % Let's add generation of A_npm, B_npm inside the loop or after.
-    % Re-doing the loop just for A/B is wasteful but safe, or vectorize.
-    % Vectorized approach:
-    pair_idx = 1:N*(N-1)/2;
-    % We need n and m indices for each cnm.
-    % It's complex to get n,m back from cnm without M_nm matrix.
-    % Let's rebuild M_nm earlier?
-    % Actually we can just do a quick loop to fill A_npm/B_npm arrays.
-    
-    A_npm = zeros(1, length(F_npm));
-    B_npm = zeros(1, length(F_npm));
-    cnm_fill = 0;
-    for n_idx = 1:N
-        for m_idx = n_idx+1:N
-            for pm = [1 -1]
-                cnm_fill = cnm_fill + 1;
-                A_npm(cnm_fill) = 1/h*(a(n_idx)*a(m_idx) - pm*b(n_idx)*b(m_idx));
-                B_npm(cnm_fill) = 1/h*(a(m_idx)*b(n_idx) + pm*a(n_idx)*b(m_idx));
+                F_npmpp(c3) = Gamma3(omega1(n),kx(n),ky(n),kappa(n), omega1(m),kx(m),ky(m),kappa(m), omega1(p),kx(p),ky(p),kappa(p), ...
+                    kappa_npm(idxSum_nm),gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                    kappa_npm(idxSum_np),gamma_npm(idxSum_np),G_npm(idxSum_np),F_npm(idxSum_np), ...
+                    kappa_npm(idxSum_mp),gamma_npm(idxSum_mp),G_npm(idxSum_mp),F_npm(idxSum_mp), ...
+                    omega_npmpp(c3),beta_npmpp(c3), g,h);
+
+                mu_npmpp(c3) = Pi(omega1(n),kappa(n), omega1(m),kappa(m), omega1(p),kappa(p), ...
+                    gamma_npm(idxSum_nm),G_npm(idxSum_nm),F_npm(idxSum_nm), ...
+                    gamma_npm(idxSum_np),G_npm(idxSum_np),F_npm(idxSum_np), ...
+                    gamma_npm(idxSum_mp),G_npm(idxSum_mp),F_npm(idxSum_mp), ...
+                    F_npmpp(c3),kappa_npmpp(c3), g,h);
             end
         end
     end
+end
+
+% Output coefficients
+coeffs.g = g;
+coeffs.h = h;
+coeffs.N = N;
+coeffs.a = a;
+coeffs.b = b;
+coeffs.kx = kx;
+coeffs.ky = ky;
+coeffs.Ux = Ux;
+coeffs.Uy = Uy;
+coeffs.kappa = kappa;
+coeffs.omega1 = omega1;
+coeffs.omega = omega;
+coeffs.mu = mu;
+coeffs.muStar = muStar;
+coeffs.F = F;
+coeffs.c = c;
+coeffs.kappa_2 = kappa_2;
+coeffs.superharmonic_only = true;
+
+if order >= 2
+    coeffs.A_2 = A_2;
+    coeffs.B_2 = B_2;
+    coeffs.F_2 = F_2;
+    coeffs.G_2 = G_2;
+    coeffs.mu_2 = mu_2;
+
+    coeffs.F_npm = F_npm;
+    coeffs.G_npm = G_npm;
     coeffs.A_npm = A_npm;
     coeffs.B_npm = B_npm;
+    coeffs.mu_npm = mu_npm;
+    coeffs.kappa_npm = kappa_npm;
+    coeffs.omega_npm = omega_npm;
 
-    coeffs.mu_npm = mu_npm; coeffs.kappa_npm = kappa_npm; coeffs.omega_npm = omega_npm;
-    coeffs.kx_2 = kx_2; coeffs.ky_2 = ky_2; coeffs.kx_npm = kx_npm; coeffs.ky_npm = ky_npm;
+    coeffs.kx_2 = kx_2;
+    coeffs.ky_2 = ky_2;
+    coeffs.kx_npm = kx_npm;
+    coeffs.ky_npm = ky_npm;
+    coeffs.M = M;
 end
+
 if order >= 3
-    % coeffs.F_3 ... omitted
-    coeffs.gamma_2 = 2*kappa.*sinh(h*2*kappa); % Calculated locally in loop but might be needed out
-    
-    % Need A_np2m, B_np2m, A_2npm, B_2npm
-    % Re-calculate
-    A_np2m = zeros(1, length(F_np2m)); B_np2m = zeros(1, length(F_np2m));
-    A_2npm = zeros(1, length(F_2npm)); B_2npm = zeros(1, length(F_2npm));
-    cnm_fill = 0;
-    for n_idx = 1:N 
-        for m_idx = n_idx+1:N
-             cnm_fill = cnm_fill + 1;
-             % pm=1
-             % Eq 3.36 for n+2m
-             % ThetaA(n, n, m, m, m, m) ?? No.
-             % Eq 3.36: A_np2m = 1/2*ThetaA(a(n),b(n), a(m), b(m), a(m), b(m), h);
-             % Note: Theta functions are defined at bottom of file.
-             % We need to call them or inline them.
-             % Inline ThetaA: (an*am*ap - bn*bm*ap - bn*am*bp - an*bm*bp)/(h^2)
-             
-             % For n+2m: args are (n), (m), (m) with pm=1 implies b(m)
-             an=a(n_idx); bn=b(n_idx); am=a(m_idx); bm=b(m_idx);
-             A_np2m(cnm_fill) = 1/2 * (an*am*am - bn*bm*am - bn*am*bm - an*bm*bm)/(h^2);
-             % ThetaB
-             B_np2m(cnm_fill) = 1/2 * (bn*am*am + an*bm*am + an*am*bm - bn*bm*bm)/(h^2);
-             
-             % For 2n+m
-             % A_2npm = 1/2*ThetaA(n,n, n,n, m,m)
-             A_2npm(cnm_fill) = 1/2 * (an*an*am - bn*bn*am - bn*an*bm - an*bn*bm)/(h^2);
-             B_2npm(cnm_fill) = 1/2 * (bn*an*am + an*bn*am + an*an*bm - bn*bn*bm)/(h^2);
-        end
+    coeffs.A_3 = A_3;
+    coeffs.B_3 = B_3;
+    coeffs.F_3 = F_3;
+    coeffs.G_3 = G_3;
+    coeffs.mu_3 = mu_3;
+    coeffs.kappa_3 = kappa_3;
+    coeffs.F13 = F13;
+
+    coeffs.A_np2m = A_np2m;
+    coeffs.B_np2m = B_np2m;
+    coeffs.F_np2m = F_np2m;
+    coeffs.G_np2m = G_np2m;
+    coeffs.mu_np2m = mu_np2m;
+    coeffs.kappa_np2m = kappa_np2m;
+
+    coeffs.A_2npm = A_2npm;
+    coeffs.B_2npm = B_2npm;
+    coeffs.F_2npm = F_2npm;
+    coeffs.G_2npm = G_2npm;
+    coeffs.mu_2npm = mu_2npm;
+    coeffs.kappa_2npm = kappa_2npm;
+
+    coeffs.omega_np2m = omega_np2m;
+    coeffs.omega_2npm = omega_2npm;
+
+    coeffs.A_npmpp = A_npmpp;
+    coeffs.B_npmpp = B_npmpp;
+    coeffs.F_npmpp = F_npmpp;
+    coeffs.G_npmpp = G_npmpp;
+    coeffs.mu_npmpp = mu_npmpp;
+    coeffs.kappa_npmpp = kappa_npmpp;
+    coeffs.omega_npmpp = omega_npmpp;
+
+    coeffs.kx_np2m = kx_np2m;
+    coeffs.ky_np2m = ky_np2m;
+    coeffs.kx_2npm = kx_2npm;
+    coeffs.ky_2npm = ky_2npm;
+    coeffs.kx_npmpp = kx_npmpp;
+    coeffs.ky_npmpp = ky_npmpp;
+    coeffs.gamma_2 = gamma_2;
+end
+
+if dispCoeffs == 1
+    disp(' ');
+    disp('Transfer function coefficients:');
+    if order >= 2
+        disp(['G_2n = ' num2str(G_2)]);
+        disp(['F_2n = ' num2str(F_2)]);
+        disp(['mu_2n = ' num2str(mu_2)]);
+        disp(['G_npm = ' num2str(G_npm)]);
+        disp(['F_npm = ' num2str(F_npm)]);
+        disp(['mu_npm = ' num2str(mu_npm)]);
     end
-    coeffs.A_np2m = A_np2m; coeffs.B_np2m = B_np2m; 
-    coeffs.A_2npm = A_2npm; coeffs.B_2npm = B_2npm; 
-    
-    coeffs.F_np2m = F_np2m; coeffs.G_np2m = G_np2m; coeffs.mu_np2m = mu_np2m;
-    coeffs.kappa_np2m = kappa_np2m; coeffs.kappa_2npm = kappa_2npm;
-    
-    coeffs.F_2npm = F_2npm; coeffs.G_2npm = G_2npm; coeffs.mu_2npm = mu_2npm;
-    coeffs.omega_np2m = omega_np2m; coeffs.omega_2npm = omega_2npm;
-    
-    % Need A_npmpp, B_npmpp
-    A_npmpp = zeros(1, length(F_npmpp)); B_npmpp = zeros(1, length(F_npmpp));
-    c3_fill = 0;
-    for n_idx = 1:N
-        for m_idx = n_idx+1:N
-            for p_idx = m_idx+1:N
-                 c3_fill = c3_fill + 1;
-                 % n+m+p
-                 an=a(n_idx); bn=b(n_idx); am=a(m_idx); bm=b(m_idx); ap=a(p_idx); bp=b(p_idx);
-                 A_npmpp(c3_fill) = 1/2 * (an*am*ap - bn*bm*ap - bn*am*bp - an*bm*bp)/(h^2);
-                 B_npmpp(c3_fill) = 1/2 * (bn*am*ap + an*bm*ap + an*am*bp - bn*bm*bp)/(h^2);
-            end
-        end
+    if order == 3
+        disp(['G_3n = ' num2str(G_3)]);
+        disp(['F_3n = ' num2str(F_3)]);
+        disp(['mu_3n = ' num2str(mu_3)]);
+        disp(['G_npmpp = ' num2str(G_npmpp)]);
+        disp(['F_npmpp = ' num2str(F_npmpp)]);
+        disp(['mu_npmpp = ' num2str(mu_npmpp)]);
+        disp(['G_np2m = ' num2str(G_np2m)]);
+        disp(['F_np2m = ' num2str(F_np2m)]);
+        disp(['mu_np2m = ' num2str(mu_np2m)]);
+        disp(['G_2npm = ' num2str(G_2npm)]);
+        disp(['F_2npm = ' num2str(F_2npm)]);
+        disp(['mu_2npm = ' num2str(mu_2npm)]);
     end
-    coeffs.A_npmpp = A_npmpp; coeffs.B_npmpp = B_npmpp;
-    
-    coeffs.F_npmpp = F_npmpp; coeffs.G_npmpp = G_npmpp; coeffs.mu_npmpp = mu_npmpp;
-    coeffs.kappa_npmpp = kappa_npmpp; coeffs.omega_npmpp = omega_npmpp;
-    coeffs.kx_np2m = kx_np2m; coeffs.ky_np2m = ky_np2m;
-    coeffs.kx_2npm = kx_2npm; coeffs.ky_2npm = ky_2npm;
-    coeffs.kx_npmpp = kx_npmpp; coeffs.ky_npmpp = ky_npmpp;
-    
-    % Also, need A_3, B_3 for self-self-self if order=3
-    % A_3 = 1/2*ThetaA(n,n,n);
-    coeffs.A_3 = zeros(size(a)); coeffs.B_3 = zeros(size(a));
-    % G_3 and mu_3?
-    % In original code G_3(n) was computed. In our simplified code, we skipped single corrections?
-    % Let's check above lines 70 in coeffs_superharmonic... we skipped single summations!
-    % But we need G_3 for 3rd harmonic.
-    % Let's quickly add G_3 calculation here or via loop below.
-    % G_3 definition: Eq 3.64.
-    kappa_3 = 3*kappa;
-    F_3 = 1/32*(h^2*kappa.*h.*omega1)./(sinh(h*kappa).^7).*(-11 + 2*cosh(2*h*kappa)); 
-    G_3 = 3/128*h^2*kappa.^2./(sinh(h*kappa).^6).*(14 + 15*cosh(2*h*kappa) + 6*cosh(4*h*kappa) + cosh(6*h*kappa));
-    mu_3 = F_3.*cosh(h*kappa_3) - g*h^2/4*kappa.^2./omega1 + h/2.*(F_2.*(2*kappa.*sinh(h*2*kappa)) - omega1.*G_2); % Approx
-    
-    for n_idx = 1:N
-        an=a(n_idx); bn=b(n_idx);
-        % ThetaA(n,n,n)
-        coeffs.A_3(n_idx) = 1/2 * (an*an*an - bn*bn*an - bn*an*bn - an*bn*bn)/(h^2);
-        coeffs.B_3(n_idx) = 1/2 * (bn*an*an + an*bn*an + an*an*bn - bn*bn*bn)/(h^2);
+end
+
+    function [omega_out,kx_out,ky_out,kappa_out,alpha_out,gamma_out,beta_out,F_out,G_out,mu_out] = pair_terms(pm,n,m)
+        omega_out = omega1(n) + pm*omega1(m);
+        kx_out = kx(n) + pm*kx(m);
+        ky_out = ky(n) + pm*ky(m);
+        kappa_out = hypot(kx_out, ky_out);
+        alpha_out = omega_out*cosh(h*kappa_out);
+        gamma_out = kappa_out*sinh(h*kappa_out);
+        beta_out = omega_out^2*cosh(h*kappa_out) - g*kappa_out*sinh(h*kappa_out);
+
+        F_out = Gamma2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
+            omega_out,beta_out, g,h);
+        G_out = Lambda2(omega1(n),kx(n),ky(n),kappa(n), pm*omega1(m),pm*kx(m),pm*ky(m),kappa(m), ...
+            omega_out,alpha_out,gamma_out,beta_out, g,h);
+        mu_out = F_out*cosh(h*kappa_out) - 0.5*h*(omega1(n) + pm*omega1(m));
     end
-    coeffs.G_3 = G_3; coeffs.mu_3 = mu_3; coeffs.F_3 = F_3;
-end
-end % End of function
-
-%%% Third-order internal functions (Helper Functions)
-% Upsilon_nm function, Eq. 3.68, p. 316
-function out = Upsilon_nm(omega1n,knx,kny,kappan, omega1m, kmx,kmy,kappam, Fnpm,Fnmm,Gnpm,Gnmm, kappanpm,kappanmm, g,h)
-    knkm = knx*kmx + kny*kmy;
-    out = g/(4*omega1n*omega1m*cosh(h*kappan))*(omega1m*(kappan^2 - kappam^2) - omega1n*knkm) ...
-        + (Gnpm + Gnmm)/(4*h*omega1n^2*omega1m*cosh(h*kappan))*(g^2*knkm + omega1m^3*omega1n) ...
-        - 1/(4*h*cosh(h*kappan))*(Fnpm*kappanpm*sinh(h*kappanpm) + Fnmm*kappanmm*sinh(h*kappanmm)) ...
-        + g*Fnpm*cosh(h*kappanpm)/(4*h*omega1n^2*omega1m*cosh(h*kappan))*((omega1n + omega1m)*(knkm + kappam^2) - omega1m*kappanpm^2) ...
-        + g*Fnmm*cosh(h*kappanmm)/(4*h*omega1n^2*omega1m*cosh(h*kappan))*((omega1n - omega1m)*(knkm - kappam^2) - omega1m*kappanmm^2);
 end
 
-% Xi function, Eq. 3.86, p. 319
-function out = Xi_nm(omega1n,kappan, omega1m, Gnpm,Fnpm,gamma_npm, Gnmm,Fnmm,gamma_nmm, h,g)
-    out = 1/(2*h)*(omega1m*(Gnpm - Gnmm) + Fnpm*gamma_npm + Fnmm*gamma_nmm - g*h*kappan^2/(2*omega1n));
-end
-
-% ThetaA function, Eq. 3.34, p. 312
-function out = ThetaA(an,bn, am,bm, ap,bp, h)
-    out = (an*am*ap - bn*bm*ap - bn*am*bp - an*bm*bp)/(h^2); % Eq. 3.34
-end
-
-% ThetaB function, Eq. 3.35, p. 312
-function out = ThetaB(an,bn, am,bm, ap,bp, h)
-    out = (bn*am*ap + an*bm*ap + an*am*bp - bn*bm*bp)/(h^2);
-end
-
-% Omega_nm function, Eq. 3.75, p. 317
-function out = Omega_nm(omega1n,knx,kny, omega1m,kmx,kmy,kappam, Fnpm,Fnmm,Gnpm,Gnmm, kappanpm,kappanmm, g,h)
-    knkm = knx*kmx + kny*kmy;
-    out = 1/(kappam^2)*((2*omega1m^2 + omega1n^2)/(4*omega1n*omega1m)*knkm + 1/4*kappam^2) ...
-        + (Gnpm + Gnmm)/(kappam^2)*(g*knkm/(4*h*omega1n*omega1m) - omega1m^2/(4*g*h)) ...
-        + omega1n/(4*g*h*kappam^2)*(Fnpm*kappanpm*sinh(h*kappanpm) + Fnmm*kappanmm*sinh(h*kappanmm)) ...
-        - Fnpm*cosh(h*kappanpm)/(4*h*omega1n*omega1m*kappam^2)*((omega1n - omega1m)*(kappam^2 + knkm) + omega1m*kappanpm^2) ...
-        + Fnmm*cosh(h*kappanmm)/(4*h*omega1n*omega1m*kappam^2)*((omega1n + omega1m)*(kappam^2 - knkm) - omega1m*kappanmm^2);
-end
-
-%%% Second-order internal functions
 % Lambda2 function, Eq. 3.18, p. 310
 function out = Lambda2(omega1n,knx,kny,kappan, omega1m,kmx,kmy,kappam, omega_npm,alpha_npm,gamma_npm,beta_npm,g,h)
-    knkm = knx*kmx + kny*kmy; % Dot product of wave number vectors
+    knkm = knx*kmx + kny*kmy;
     out = h/(2*omega1n*omega1m*beta_npm)*(g*alpha_npm*(omega1n*(kappam^2 + knkm) ...
                                                      + omega1m*(kappan^2 + knkm)) ...
         + gamma_npm*(g^2*knkm + omega1n^2*omega1m^2 - omega1n*omega1m*omega_npm^2));
@@ -472,12 +429,48 @@ function out = Gamma2(omega1n,knx,kny,kappan, omega1m,kmx,kmy,kappam, omega_npm,
         - g^2*omega1n*(kappam^2 + 2*knkm) - g^2*omega1m*(kappan^2 + 2*knkm));
 end
 
-%%% Third-order internal functions
+% Upsilon_nm function, Eq. 3.68, p. 316
+function out = Upsilon_nm(omega1n,knx,kny,kappan, omega1m, kmx,kmy,kappam, Fnpm,Fnmm,Gnpm,Gnmm, kappanpm,kappanmm, g,h)
+    knkm = knx*kmx + kny*kmy;
+    out = g/(4*omega1n*omega1m*cosh(h*kappan))*(omega1m*(kappan^2 - kappam^2) - omega1n*knkm) ...
+        + (Gnpm + Gnmm)/(4*h*omega1n^2*omega1m*cosh(h*kappan))*(g^2*knkm + omega1m^3*omega1n) ...
+        - 1/(4*h*cosh(h*kappan))*(Fnpm*kappanpm*sinh(h*kappanpm) + Fnmm*kappanmm*sinh(h*kappanmm)) ...
+        + g*Fnpm*cosh(h*kappanpm)/(4*h*omega1n^2*omega1m*cosh(h*kappan))*((omega1n + omega1m)*(knkm + kappam^2) - omega1m*kappanpm^2) ...
+        + g*Fnmm*cosh(h*kappanmm)/(4*h*omega1n^2*omega1m*cosh(h*kappan))*((omega1n - omega1m)*(knkm - kappam^2) - omega1m*kappanmm^2);
+end
+
+% Xi_nm function, Eq. 3.86, p. 319
+function out = Xi_nm(omega1n,kappan, omega1m, Gnpm,Fnpm,gamma_npm, Gnmm,Fnmm,gamma_nmm, h,g)
+    out = 1/(2*h)*(omega1m*(Gnpm - Gnmm) + Fnpm*gamma_npm + Fnmm*gamma_nmm - g*h*kappan^2/(2*omega1n));
+end
+
+% ThetaA function, Eq. 3.34, p. 312
+function out = ThetaA(an,bn, am,bm, ap,bp, h)
+    out = (an*am*ap - bn*bm*ap - bn*am*bp - an*bm*bp)/(h^2);
+end
+
+% ThetaB function, Eq. 3.35, p. 312
+function out = ThetaB(an,bn, am,bm, ap,bp, h)
+    out = (bn*am*ap + an*bm*ap + an*am*bp - bn*bm*bp)/(h^2);
+end
+
+% Omega_nm function, Eq. 3.75, p. 317
+function out = Omega_nm(omega1n,knx,kny, omega1m,kmx,kmy,kappam, Fnpm,Fnmm,Gnpm,Gnmm, kappanpm,kappanmm, g,h)
+    knkm = knx*kmx + kny*kmy;
+    out = 1/(kappam^2)*((2*omega1m^2 + omega1n^2)/(4*omega1n*omega1m)*knkm + 0.25*kappam^2) ...
+        + (Gnpm + Gnmm)/(kappam^2)*(g*knkm/(4*h*omega1n*omega1m) - omega1m^2/(4*g*h)) ...
+        + omega1n/(4*g*h*kappam^2)*(Fnpm*kappanpm*sinh(h*kappanpm) + Fnmm*kappanmm*sinh(h*kappanmm)) ...
+        - Fnpm*cosh(h*kappanpm)/(4*h*omega1n*omega1m*kappam^2)*((omega1n - omega1m)*(kappam^2 + knkm) + omega1m*kappanpm^2) ...
+        + Fnmm*cosh(h*kappanmm)/(4*h*omega1n*omega1m*kappam^2)*((omega1n + omega1m)*(kappam^2 - knkm) - omega1m*kappanmm^2);
+end
+
 % Lambda3 function, Eq. 3.53, p. 313-314
 function out = Lambda3(omega1n,knx,kny,kappan, omega1m,kmx,kmy,kappam, omega1p,kpx,kpy,kappap, ...
                        kappanpm,gammanpm,Gnpm,Fnpm, kappanpp,gammanpp,Gnpp,Fnpp, kappampp,gammampp,Gmpp,Fmpp, ...
                        omega_npmpp,alpha_npmpp,gamma_npmpp,beta_npmpp, g,h)
-    knkm = knx*kmx + kny*kmy; knkp = knx*kpx + kny*kpy; kmkp = kmx*kpx + kmy*kpy; 
+    knkm = knx*kmx + kny*kmy;
+    knkp = knx*kpx + kny*kpy;
+    kmkp = kmx*kpx + kmy*kpy;
     out = h^2/(4*beta_npmpp)*(alpha_npmpp*(omega1n*(knkm + knkp + kappan^2) + ...
         omega1m*(knkm + kmkp + kappam^2) + omega1p*(knkp + kmkp + kappap^2)) ...
         + gamma_npmpp*(g/omega1n*(omega1m*knkm + omega1p*knkp - omega_npmpp*kappan^2) + ...
@@ -486,9 +479,9 @@ function out = Lambda3(omega1n,knx,kny,kappan, omega1m,kmx,kmy,kappam, omega1p,k
         - h*Fnpm/(2*beta_npmpp)*(alpha_npmpp*cosh(h*kappanpm)*(knkp + kmkp + kappanpm^2) + ...
           gamma_npmpp*(g/omega1p*(knkp + kmkp)*cosh(h*kappanpm) - gammanpm*omega_npmpp)) ...
         - h*Fnpp/(2*beta_npmpp)*(alpha_npmpp*cosh(h*kappanpp)*(knkm + kmkp + kappanpp^2) + ...
-          gamma_npmpp*(g/omega1m*(knkm + kmkp)*cosh(h*kappanpp) - gammanpp*omega_npmpp)) ... 
+          gamma_npmpp*(g/omega1m*(knkm + kmkp)*cosh(h*kappanpp) - gammanpp*omega_npmpp)) ...
         - h*Fmpp/(2*beta_npmpp)*(alpha_npmpp*cosh(h*kappampp)*(knkm + knkp +kappampp^2) + ...
-          gamma_npmpp*(g/omega1n*(knkm + knkp)*cosh(h*kappampp) - gammampp*omega_npmpp)) ...  
+          gamma_npmpp*(g/omega1n*(knkm + knkp)*cosh(h*kappampp) - gammampp*omega_npmpp)) ...
         + h*Gnpm/(2*beta_npmpp)*(alpha_npmpp*g/omega1p*(knkp + kmkp + kappap^2) - gamma_npmpp*omega1p^2) ...
         + h*Gnpp/(2*beta_npmpp)*(alpha_npmpp*g/omega1m*(knkm + kmkp + kappam^2) - gamma_npmpp*omega1m^2) ...
         + h*Gmpp/(2*beta_npmpp)*(alpha_npmpp*g/omega1n*(knkm + knkp + kappan^2) - gamma_npmpp*omega1n^2);
@@ -498,10 +491,12 @@ end
 function out = Gamma3(omega1n,knx,kny,kappan, omega1m,kmx,kmy,kappam, omega1p,kpx,kpy,kappap, ...
                       kappanpm,gammanpm,Gnpm,Fnpm, kappanpp,gammanpp,Gnpp,Fnpp, kappampp,gammampp,Gmpp,Fmpp, ...
                       omega_npmpp,beta_npmpp, g,h)
-    knkm = knx*kmx + kny*kmy; knkp = knx*kpx + kny*kpy; kmkp = kmx*kpx + kmy*kpy; 
+    knkm = knx*kmx + kny*kmy;
+    knkp = knx*kpx + kny*kpy;
+    kmkp = kmx*kpx + kmy*kpy;
     out = -g*h^2/(4*beta_npmpp)*(omega1n*(knkm + knkp + kappan^2) ...
         + omega1m*(knkm + kmkp + kappam^2) + omega1p*(knkp + kmkp + kappap^2) ...
-        + omega_npmpp/omega1n*(omega1m*knkm + omega1p*knkp - omega_npmpp*kappan^2) ... 
+        + omega_npmpp/omega1n*(omega1m*knkm + omega1p*knkp - omega_npmpp*kappan^2) ...
         + omega_npmpp/omega1m*(omega1n*knkm + omega1p*kmkp - omega_npmpp*kappam^2) ...
         + omega_npmpp/omega1p*(omega1n*knkp + omega1m*kmkp - omega_npmpp*kappap^2)) ...
         + h*Fnpm/(2*beta_npmpp)*(g*cosh(h*kappanpm)*((knkp + kmkp + kappanpm^2) + ...
@@ -517,9 +512,9 @@ end
 
 % Pi function, Eq. 3.81, p. 318
 function out = Pi(omega1n,kappan, omega1m,kappam, omega1p,kappap, ...
-    gamma_npm,Gnpm,Fnpm, gamma_npp,Gnpp,Fnpp, gamma_mpp,Gmpp,Fmpp, Fnpmpp,kappa_npmpp, g,h) % Eq. 3.82
+    gamma_npm,Gnpm,Fnpm, gamma_npp,Gnpp,Fnpp, gamma_mpp,Gmpp,Fmpp, Fnpmpp,kappa_npmpp, g,h)
     out = Fnpmpp*cosh(h*kappa_npmpp) ...
         - g*h^2/4*(kappan^2/omega1n + kappam^2/omega1m + kappap^2/omega1p) ...
         - h/2*(omega1n*Gmpp + omega1m*Gnpp + omega1p*Gnpm) ...
-        + h/2*(Fnpm*gamma_npm + Fnpp*gamma_npp + Fmpp*gamma_mpp); % Eq. 3.81
+        + h/2*(Fnpm*gamma_npm + Fnpp*gamma_npp + Fmpp*gamma_mpp);
 end

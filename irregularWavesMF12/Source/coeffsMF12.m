@@ -161,7 +161,7 @@ if order == 3
         % Transfer functions
         A_3(n) = 1/2*ThetaA(a(n),b(n), a(n),b(n), a(n),b(n), h); % Eq. 3.38
         B_3(n) = 1/2*ThetaB(a(n),b(n), a(n),b(n), a(n),b(n), h); % Eq. 3.39
-        F_3(n) = 1/32*(h^2*kappa(n)*h*omega1(n))/(sinh(h*kappa(n))^7)*(-11 + 2*cosh(2*h*kappa(n))); % Eq. 3.65
+        F_3(n) = 1/32*(h^2*kappa(n)*omega1(n))/(sinh(h*kappa(n))^7)*(-11 + 2*cosh(2*h*kappa(n))); % Eq. 3.65
         G_3(n) = 3/128*h^2*kappa(n)^2/(sinh(h*kappa(n))^6)*(14 + 15*cosh(2*h*kappa(n)) + 6*cosh(4*h*kappa(n)) + cosh(6*h*kappa(n))); % Eq. 3.64
         mu_3(n) = F_3(n)*cosh(h*kappa_3(n)) - g*h^2/4*kappa(n)^2/omega1(n) + h/2*(F_2(n)*gamma_2(n) - omega1(n)*G_2(n)); % Eq. 3.80
     end

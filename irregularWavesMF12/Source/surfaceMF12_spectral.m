@@ -51,6 +51,7 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     % Helper variables
     Ux = coeffs.Ux;
     Uy = coeffs.Uy;
+    superOnly = isfield(coeffs, 'superharmonic_only') && coeffs.superharmonic_only;
     
     % --- 1. First Order Terms ---
     % eta = sum( a*cos(theta) + b*sin(theta) )
@@ -92,17 +93,17 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     % Construct Linear Coefficients
     % Fix: Use (a - ib) to correspond to physical a*cos(theta) + b*sin(theta)
     % when reconstructed via IFFT (which uses exp(+ikx)).
-    Z_lin = (coeffs.a(:) - 1i*coeffs.b(:)) .* exp(-1i * omega * t);
+    Z_lin = (coeffs.a(:) + 1i*coeffs.b(:)) .* exp(-1i * omega * t);
     
     % Accumulate Linear Eta (G=1 implicitly)
     accumulate_spectrum(kx, ky, Z_lin); 
     
     % Accumulate Linear Phi
     % Target: mu * (a*sin - b*cos)
-    % Z_phi = Z_lin * (-1i) = (a-ib)(-i) = -b - ia
-    % Re( (-b-ia)(c+is) ) = -b*c + a*s = a*sin - b*cos. Correct.
+    % Z_phi = Z_lin * (1i).
+    % For Z_lin = (a+ib)e^{-iwt}, Real(i*Z_lin*e^{ikx}) = a*sin(theta) - b*cos(theta).
     mu_total = coeffs.mu(:) + coeffs.muStar(:);
-    accumulate_spectrum(kx, ky, Z_lin .* mu_total * (-1i), 'phi');
+    accumulate_spectrum(kx, ky, Z_lin .* mu_total * (1i), 'phi');
 
 
     % --- 2. Second Order ---
@@ -114,18 +115,18 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         ky2 = 2*coeffs.ky(:);
         om2 = 2*coeffs.omega(:); % Note: usually it's phase doubling.
         
-        Z_2 = (coeffs.A_2(:) - 1i*coeffs.B_2(:)) .* exp(-1i * om2 * t);
+        Z_2 = (coeffs.A_2(:) + 1i*coeffs.B_2(:)) .* exp(-1i * om2 * t);
         
         accumulate_spectrum(kx2, ky2, Z_2 .* coeffs.G_2(:), 'eta');
-        accumulate_spectrum(kx2, ky2, Z_2 .* coeffs.mu_2(:) * (-1i), 'phi');
+        accumulate_spectrum(kx2, ky2, Z_2 .* coeffs.mu_2(:) * (1i), 'phi');
     end
 
     if isfield(coeffs, 'G_npm') % Sum Interactions
         % k = k_npm, omega = omega_npm
-        Z_npm = (coeffs.A_npm(:) - 1i*coeffs.B_npm(:)) .* exp(-1i * coeffs.omega_npm(:) * t);
+        Z_npm = (coeffs.A_npm(:) + 1i*coeffs.B_npm(:)) .* exp(-1i * coeffs.omega_npm(:) * t);
         
         accumulate_spectrum(coeffs.kx_npm(:), coeffs.ky_npm(:), Z_npm .* coeffs.G_npm(:), 'eta');
-        accumulate_spectrum(coeffs.kx_npm(:), coeffs.ky_npm(:), Z_npm .* coeffs.mu_npm(:) * (-1i), 'phi');
+        accumulate_spectrum(coeffs.kx_npm(:), coeffs.ky_npm(:), Z_npm .* coeffs.mu_npm(:) * (1i), 'phi');
     end
 
     % --- 3. Third Order ---
@@ -134,9 +135,9 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         ky3 = 3*coeffs.ky(:);
         om3 = 3*coeffs.omega(:); % Approximation of phase 3*theta
         
-        Z_3 = (coeffs.A_3(:) - 1i*coeffs.B_3(:)) .* exp(-1i * om3 * t);
+        Z_3 = (coeffs.A_3(:) + 1i*coeffs.B_3(:)) .* exp(-1i * om3 * t);
         accumulate_spectrum(kx3, ky3, Z_3 .* coeffs.G_3(:), 'eta');
-        accumulate_spectrum(kx3, ky3, Z_3 .* coeffs.mu_3(:) * (-1i), 'phi');
+        accumulate_spectrum(kx3, ky3, Z_3 .* coeffs.mu_3(:) * (1i), 'phi');
     end
     
     % --- Helper for correct B sign ---
@@ -194,22 +195,17 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     % Okay, so the sign is not the issue. The masking is.
 
     if isfield(coeffs, 'G_np2m') % Double Sum (n+2m)
-        % Detect if coeffs are from Full (Mixed Sum/Diff) or Superharmonic-Only source
-        if isfield(coeffs, 'N'), N_c = coeffs.N; else, N_c = len_lin; end
-        expected_pairs = N_c * (N_c - 1) / 2;
         len_coeffs = length(coeffs.G_np2m);
-        
-        isSuperharmonicOnly = (len_coeffs == expected_pairs);
-        
-        if isSuperharmonicOnly
+
+        if superOnly
             mask = true(len_coeffs, 1);
         else
             % Full: coeffsMF12 stores [Sum, Diff, Sum, Diff...] for pm=[1, -1].
-            % We keep only pm=1 (Superharmonics) as per surfaceMF12_new logic?
+            % Keep only pm=1 (superharmonics), matching surfaceMF12_new behavior.
             mask = 1:2:len_coeffs;
         end
-        
-        Z_np2m = (coeffs.A_np2m(mask) - 1i*coeffs.B_np2m(mask)) .* exp(-1i * coeffs.omega_np2m(mask) * t);
+
+        Z_np2m = (coeffs.A_np2m(mask) + 1i*coeffs.B_np2m(mask)) .* exp(-1i * coeffs.omega_np2m(mask) * t);
         
         % Ensure column vectors for Z and coefficients
         Z_np2m = Z_np2m(:);
@@ -219,22 +215,19 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         k_y = coeffs.ky_np2m(mask); k_y = k_y(:);
         
         accumulate_spectrum(k_x, k_y, Z_np2m .* G_val, 'eta');
-        accumulate_spectrum(k_x, k_y, Z_np2m .* mu_val * (-1i), 'phi');
+        accumulate_spectrum(k_x, k_y, Z_np2m .* mu_val * (1i), 'phi');
     end
 
     if isfield(coeffs, 'G_2npm') % Double Sum (2n+m)
-        if isfield(coeffs, 'N'), N_c = coeffs.N; else, N_c = len_lin; end
-        expected_pairs = N_c * (N_c - 1) / 2;
         len_coeffs = length(coeffs.G_2npm);
-        isSuperharmonicOnly = (len_coeffs == expected_pairs);
 
-        if isSuperharmonicOnly
-             mask = true(len_coeffs, 1);
+        if superOnly
+            mask = true(len_coeffs, 1);
         else
-             mask = 1:2:len_coeffs;
+            mask = 1:2:len_coeffs;
         end
         
-        Z_2npm = (coeffs.A_2npm(mask) - 1i*coeffs.B_2npm(mask)) .* exp(-1i * coeffs.omega_2npm(mask) * t);
+        Z_2npm = (coeffs.A_2npm(mask) + 1i*coeffs.B_2npm(mask)) .* exp(-1i * coeffs.omega_2npm(mask) * t);
         
         Z_2npm = Z_2npm(:);
         G_val = coeffs.G_2npm(mask); G_val = G_val(:);
@@ -243,11 +236,11 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         k_y = coeffs.ky_2npm(mask); k_y = k_y(:);
         
         accumulate_spectrum(k_x, k_y, Z_2npm .* G_val, 'eta');
-        accumulate_spectrum(k_x, k_y, Z_2npm .* mu_val * (-1i), 'phi');
+        accumulate_spectrum(k_x, k_y, Z_2npm .* mu_val * (1i), 'phi');
     end
     
     if isfield(coeffs, 'G_npmpp') % Triple Sum (n+m+p)
-        if isfield(coeffs, 'N'), N_c = coeffs.N; else, N_c = len_lin; end
+        N_c = coeffs.N;
         % Triple sums
         % Count: N*(N-1)*(N-2)/6 -> unique triplets {n,m,p}.
         % Full: pmm=[1 -1], pmp=[1 -1]. 4 combinations per triplet.
@@ -256,9 +249,8 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         len_coeffs = length(coeffs.G_npmpp);
         num_triplets = N_c*(N_c-1)*(N_c-2)/6;
         
-        % Allow tolerance or exact match
-        if abs(len_coeffs - num_triplets) < 2 % Superharmonic
-             mask = true(len_coeffs, 1);
+        if superOnly
+            mask = true(len_coeffs, 1);
         else
             % Reconstruct indices for pmm=1 && pmp=1
              idx = 0;
@@ -281,7 +273,7 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
              mask = mask_log;
         end
         
-        Z_npmpp = (coeffs.A_npmpp(mask) - 1i*coeffs.B_npmpp(mask)) .* exp(-1i * coeffs.omega_npmpp(mask) * t);
+        Z_npmpp = (coeffs.A_npmpp(mask) + 1i*coeffs.B_npmpp(mask)) .* exp(-1i * coeffs.omega_npmpp(mask) * t);
         
         % Factor of 2 required for triple sums (as per surfaceMF12_new)
         Z_npmpp = Z_npmpp * 2; 
@@ -294,7 +286,7 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         k_y = coeffs.ky_npmpp(mask); k_y = k_y(:);
         
         accumulate_spectrum(k_x, k_y, Z_npmpp .* G_val, 'eta');
-        accumulate_spectrum(k_x, k_y, Z_npmpp .* mu_val * (-1i), 'phi');
+        accumulate_spectrum(k_x, k_y, Z_npmpp .* mu_val * (1i), 'phi');
     end
 
     % --- Final Spectral Accumulation ---
@@ -333,34 +325,65 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         % Index 1: k=0
         % Index 2..N/2: Positive k
         % Index N/2+1..N: Negative k
-        
-        idx_x = mod(round(k_in_x / dkx), Nx) + 1;
-        idx_y = mod(round(k_in_y / dky), Ny) + 1;
-        
-        % Ensure column vectors
-        idx_x = idx_x(:);
-        idx_y = idx_y(:);
+
+        ux = (k_in_x(:) / dkx);
+        uy = (k_in_y(:) / dky);
         vals = values(:);
-        
-        % Filter out NaNs or Infs if any
-        valid = isfinite(idx_x) & isfinite(idx_y) & isfinite(vals);
-        if ~all(valid)
-            idx_x = idx_x(valid);
-            idx_y = idx_y(valid);
-            vals = vals(valid);
-        end
-        
+
+        valid = isfinite(ux) & isfinite(uy) & isfinite(vals);
+        ux = ux(valid);
+        uy = uy(valid);
+        vals = vals(valid);
         if isempty(vals), return; end
 
-        % Append to accumulators (single accumarray call at end)
+        % Bilinear deposition in spectral-index space.
+        % For exact-grid k, this collapses to single-bin deposition.
+        ix0 = floor(ux);
+        iy0 = floor(uy);
+        fx = ux - ix0;
+        fy = uy - iy0;
+
+        % Snap near-integer values to avoid tiny floating-point leakage.
+        tol = 1e-12;
+        fx(abs(fx) < tol) = 0;
+        fy(abs(fy) < tol) = 0;
+        fx(abs(fx-1) < tol) = 1;
+        fy(abs(fy-1) < tol) = 1;
+
+        ix1 = ix0 + 1;
+        iy1 = iy0 + 1;
+
+        idx_x00 = mod(ix0, Nx) + 1;
+        idx_y00 = mod(iy0, Ny) + 1;
+        idx_x10 = mod(ix1, Nx) + 1;
+        idx_y10 = idx_y00;
+        idx_x01 = idx_x00;
+        idx_y01 = mod(iy1, Ny) + 1;
+        idx_x11 = idx_x10;
+        idx_y11 = idx_y01;
+
+        w00 = (1-fx).*(1-fy);
+        w10 = fx.*(1-fy);
+        w01 = (1-fx).*fy;
+        w11 = fx.*fy;
+
+        idx_x = [idx_x00; idx_x10; idx_x01; idx_x11];
+        idx_y = [idx_y00; idx_y10; idx_y01; idx_y11];
+        vals4 = [vals.*w00; vals.*w10; vals.*w01; vals.*w11];
+
+        nz = (abs(vals4) > 0);
+        idx_x = idx_x(nz);
+        idx_y = idx_y(nz);
+        vals4 = vals4(nz);
+
         if strcmp(type, 'eta')
             eta_idx_x = [eta_idx_x; idx_x];
             eta_idx_y = [eta_idx_y; idx_y];
-            eta_vals = [eta_vals; vals];
+            eta_vals = [eta_vals; vals4];
         else
             phi_idx_x = [phi_idx_x; idx_x];
             phi_idx_y = [phi_idx_y; idx_y];
-            phi_vals = [phi_vals; vals];
+            phi_vals = [phi_vals; vals4];
         end
     end
 

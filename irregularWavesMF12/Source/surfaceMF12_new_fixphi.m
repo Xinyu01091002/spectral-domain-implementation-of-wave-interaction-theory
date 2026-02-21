@@ -1,4 +1,4 @@
-function [eta,phiS,Mx,My] = surfaceMF12(order,coeffs,x,y,t)
+function [eta,phiS,Mx,My] = surfaceMF12_new_fixphi(order,coeffs,x,y,t)
 % A function to evaluate the third-order multi-directional irregular wave 
 % theory of Madsen & Fuhrman (2012, MF12).  The function returns the free 
 % surface elevation (eta), the free surface velocity potential (phiS), as 
@@ -86,13 +86,15 @@ if order == 3
                 
                 phiS = phiS + coeffs.mu_np2m(cnm)*(coeffs.A_np2m(cnm)*sin(theta_np2m) ...
                                                  - coeffs.B_np2m(cnm)*cos(theta_np2m)); % Eq. 3.76 (fifth line)
+                end
                 theta_2npm = 2*theta_n + pm*theta_m; % Eq. 3.30b
+                if pm==1
                 eta = eta + coeffs.G_2npm(cnm)*(coeffs.A_2npm(cnm)*cos(theta_2npm) ...
                                               + coeffs.B_2npm(cnm)*sin(theta_2npm)); % Eq. 3.28 (fourth line)
                 
                 phiS = phiS + coeffs.mu_2npm(cnm)*(coeffs.A_2npm(cnm)*sin(theta_2npm) ...
                                                  - coeffs.B_2npm(cnm)*cos(theta_2npm)); % Eq. 3.76 (sixth line)
-                end 
+                end
             end
         end
     end % End of double summation
@@ -112,12 +114,12 @@ if order == 3
                         theta_p = coeffs.omega(p).*t - coeffs.kx(p)*x - coeffs.ky(p)*y;
                         theta_npmpp = theta_n + pmm*theta_m + pmp*theta_p; % Eq. 3.31
                         if pmm==1 && pmp==1
-                        eta = eta + coeffs.G_npmpp(c3)*(coeffs.A_npmpp(c3)*cos(theta_npmpp) ...
+                        eta = eta + 2*coeffs.G_npmpp(c3)*(coeffs.A_npmpp(c3)*cos(theta_npmpp) ...
                                                       + coeffs.B_npmpp(c3)*sin(theta_npmpp)); % Eq. 3.28 (last line)
                         
-                        phiS = phiS + coeffs.mu_npmpp(c3)*(coeffs.A_npmpp(c3)*sin(theta_npmpp) ...
+                        phiS = phiS + 2*coeffs.mu_npmpp(c3)*(coeffs.A_npmpp(c3)*sin(theta_npmpp) ...
                                                          - coeffs.B_npmpp(c3)*cos(theta_npmpp)); % Eq. 3.76 (last line)
-                        end
+                        end     
                     end % End of pmp loop
                 end % End of p loop
             end % End of pmm loop
@@ -126,3 +128,4 @@ if order == 3
 end % End of third order
 
 end % End of function
+
