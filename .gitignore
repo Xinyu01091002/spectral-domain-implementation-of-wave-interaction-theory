@@ -1,0 +1,31 @@
+# MATLAB cache and temp files
+*.asv
+*.m~
+*.autosave
+*.mlx.lock
+slprj/
+codegen/
+simulink_cache/
+*.mex*
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Generated logs and outputs from this project
+compare_log.txt
+run_output.txt
+processed_eta33/
+
+# Generated figures and verification images
+figures/
+check_crossing_sea_result.png
+compare_1st_order_lines.png
+compare_2nd_order_crossing_lines.png
+compare_2nd_order_verification.png
+compare_3rd_order_crossing_full.png
+compare_3rd_order_crossing_lines.png
+compare_total_surface_lines.png
