@@ -10,9 +10,11 @@ This repository contains MATLAB scripts for generating and comparing nonlinear w
 |- generate_crossing_sea.m               # Crossing-sea case generation
 |- benchmark_mf12_direct_vs_spectral.m   # Direct vs spectral speed/error benchmark
 |- benchmark_mf12_speed_memory.m         # Multi-method speed/memory benchmark
-|- benchmark_mf12_plot.m                 # Plot benchmark results from latest MAT file
+|- plot_mf12_theoretical_complexity_memory.m  # End-to-end theory: direct vs spectral (time+memory)
+|- plot_mf12_theoretical_three_methods.m      # Theory: direct vs spectral vs streaming
 |- plot_phi3_direct_vs_spectral.m        # 2D phi(3rd) direct vs spectral comparison
-|- plot_phi3_wavegroup_lines.m           # Wave-group phi(3rd) center/diagonal line comparison
+|- plot_phi3_wavegroup_lines.m           # Crossing-sea wave-group phi_s harmonic decomposition plots
+|- plot_eta_wavegroup_lines.m            # Crossing-sea wave-group eta harmonic decomposition plots
 |- analytic2D.m / compute_kxky.m         # Utility functions
 |- my2nd_directional_generator.m         # Directional wave generator utility
 |- irregularWavesMF12/                   # MF12 library (source + examples)
@@ -50,12 +52,32 @@ benchmark_mf12_direct_vs_spectral;
 
 % 2) Multi-method benchmark (wrapper/streaming/spectral variants)
 benchmark_mf12_speed_memory;
-benchmark_mf12_plot;
 
-% 3) Third-order phi comparison figures
+% 3) Theory figures (no hardware timing dependence)
+plot_mf12_theoretical_complexity_memory;
+plot_mf12_theoretical_three_methods;
+
+% 4) Third-order phi comparison figures
 plot_phi3_direct_vs_spectral;
 plot_phi3_wavegroup_lines;
+
+% 5) Matching eta decomposition figures
+plot_eta_wavegroup_lines;
 ```
+
+## Harmonic Decomposition Figures
+
+- `plot_phi3_wavegroup_lines.m` now generates two fixed paper-ready PNG files:
+  - `mf12_phi3_wavegroup_lines_comparison_pub.png`
+  - `mf12_phi3_wavegroup_lines_error_pub.png`
+- `plot_eta_wavegroup_lines.m` generates:
+  - `mf12_eta_wavegroup_lines_comparison_pub.png`
+  - `mf12_eta_wavegroup_lines_error_pub.png`
+
+Both scripts use crossing-sea wave-group components and provide:
+- 2x4 layout (top: centerline, bottom: diagonal)
+- Columns: first harmonic, second superharmonic, second subharmonic, third superharmonic
+- x-axis normalized by `\lambda_p`
 
 ## Recent Fixes
 

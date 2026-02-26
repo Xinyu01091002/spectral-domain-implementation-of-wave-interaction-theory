@@ -71,15 +71,15 @@ if order == 3
 end
 
 % 1) Linear terms.
-Z_lin = (a - 1i*b) .* exp(-1i * omega * t);
-spec_eta = add_to_spec(spec_eta, kx, ky, Z_lin);
-spec_phi = add_to_spec(spec_phi, kx, ky, Z_lin .* (mu + muStar) * (-1i));
+Z_lin = (a + 1i*b) .* exp(-1i * omega * t);
+add_to_spec(kx, ky, Z_lin, 'eta');
+add_to_spec(kx, ky, Z_lin .* (mu + muStar) * (1i), 'phi');
 
 % 2) Second-order terms.
 if order >= 2
-    Z_2 = (A_2 - 1i*B_2) .* exp(-1i * (2*omega) * t);
-    spec_eta = add_to_spec(spec_eta, 2*kx, 2*ky, Z_2 .* G_2);
-    spec_phi = add_to_spec(spec_phi, 2*kx, 2*ky, Z_2 .* mu_2 * (-1i));
+    Z_2 = (A_2 + 1i*B_2) .* exp(-1i * (2*omega) * t);
+    add_to_spec(2*kx, 2*ky, Z_2 .* G_2, 'eta');
+    add_to_spec(2*kx, 2*ky, Z_2 .* mu_2 * (1i), 'phi');
 
     for n = 1:N
         for m = (n+1):N
@@ -87,9 +87,9 @@ if order >= 2
                 [omega_npm, kx_npm, ky_npm, ~, ~, ~, ~, ~, G_npm, mu_npm] = pair_terms(pm, n, m);
                 A_npm = (a(n)*a(m) - pm*b(n)*b(m))/h;  % Eq. 3.10a
                 B_npm = (a(m)*b(n) + pm*a(n)*b(m))/h;  % Eq. 3.10b
-                Z_npm = (A_npm - 1i*B_npm) * exp(-1i * omega_npm * t);
-                spec_eta = add_to_spec(spec_eta, kx_npm, ky_npm, Z_npm * G_npm);
-                spec_phi = add_to_spec(spec_phi, kx_npm, ky_npm, Z_npm * mu_npm * (-1i));
+                Z_npm = (A_npm + 1i*B_npm) * exp(-1i * omega_npm * t);
+                add_to_spec(kx_npm, ky_npm, Z_npm * G_npm, 'eta');
+                add_to_spec(kx_npm, ky_npm, Z_npm * mu_npm * (1i), 'phi');
             end
         end
     end
@@ -108,14 +108,14 @@ if order == 3
     for n = 1:N
         A_3(n) = 0.5*ThetaA(a(n),b(n), a(n),b(n), a(n),b(n), h); % Eq. 3.38
         B_3(n) = 0.5*ThetaB(a(n),b(n), a(n),b(n), a(n),b(n), h); % Eq. 3.39
-        F_3(n) = (h^3*kappa(n)*omega1(n)/(32*sinh(h*kappa(n))^7))*(-11 + 2*cosh(2*h*kappa(n))); % Eq. 3.65
+        F_3(n) = (h^2*kappa(n)*omega1(n)/(32*sinh(h*kappa(n))^7))*(-11 + 2*cosh(2*h*kappa(n))); % Eq. 3.65
         G_3(n) = (3*h^2*kappa(n)^2/(128*sinh(h*kappa(n))^6))*(14 + 15*cosh(2*h*kappa(n)) + 6*cosh(4*h*kappa(n)) + cosh(6*h*kappa(n))); % Eq. 3.64
         mu_3(n) = F_3(n)*cosh(h*kappa_3(n)) - g*h^2*kappa(n)^2/(4*omega1(n)) + 0.5*h*(F_2(n)*gamma_2(n) - omega1(n)*G_2(n)); % Eq. 3.80
     end
 
-    Z_3 = (A_3 - 1i*B_3) .* exp(-1i * (3*omega) * t);
-    spec_eta = add_to_spec(spec_eta, 3*kx, 3*ky, Z_3 .* G_3);
-    spec_phi = add_to_spec(spec_phi, 3*kx, 3*ky, Z_3 .* mu_3 * (-1i));
+    Z_3 = (A_3 + 1i*B_3) .* exp(-1i * (3*omega) * t);
+    add_to_spec(3*kx, 3*ky, Z_3 .* G_3, 'eta');
+    add_to_spec(3*kx, 3*ky, Z_3 .* mu_3 * (1i), 'phi');
 
     % Double summations: n+2m and 2n+m (pm=+1 only).
     for n = 1:N
@@ -148,9 +148,9 @@ if order == 3
             mu_np2m = Pi(omega1(n),kappa(n), omega1(m),kappa(m), omega1(m),kappa(m), ...
                 gamma_nm_p,G_nm_p,F_nm_p, gamma_nm_p,G_nm_p,F_nm_p, gamma_2(m),G_2(m),F_2(m), F_np2m,kappa_np2m, g,h);
 
-            Z_np2m = (A_np2m - 1i*B_np2m) * exp(-1i * omega_np2m * t);
-            spec_eta = add_to_spec(spec_eta, kx_np2m, ky_np2m, Z_np2m * G_np2m);
-            spec_phi = add_to_spec(spec_phi, kx_np2m, ky_np2m, Z_np2m * mu_np2m * (-1i));
+            Z_np2m = (A_np2m + 1i*B_np2m) * exp(-1i * omega_np2m * t);
+            add_to_spec(kx_np2m, ky_np2m, Z_np2m * G_np2m, 'eta');
+            add_to_spec(kx_np2m, ky_np2m, Z_np2m * mu_np2m * (1i), 'phi');
 
             omega_2npm = 2*omega1(n) + omega1(m); % Eq. 3.44c, pm=+1
             kx_2npm = 2*kx(n) + kx(m);
@@ -178,9 +178,9 @@ if order == 3
             mu_2npm = Pi(omega1(n),kappa(n), omega1(n),kappa(n), omega1(m),kappa(m), ...
                 gamma_2(n),G_2(n),F_2(n), gamma_nm_p,G_nm_p,F_nm_p, gamma_nm_p,G_nm_p,F_nm_p, F_2npm,kappa_2npm, g,h);
 
-            Z_2npm = (A_2npm - 1i*B_2npm) * exp(-1i * omega_2npm * t);
-            spec_eta = add_to_spec(spec_eta, kx_2npm, ky_2npm, Z_2npm * G_2npm);
-            spec_phi = add_to_spec(spec_phi, kx_2npm, ky_2npm, Z_2npm * mu_2npm * (-1i));
+            Z_2npm = (A_2npm + 1i*B_2npm) * exp(-1i * omega_2npm * t);
+            add_to_spec(kx_2npm, ky_2npm, Z_2npm * G_2npm, 'eta');
+            add_to_spec(kx_2npm, ky_2npm, Z_2npm * mu_2npm * (1i), 'phi');
         end
     end
 
@@ -218,9 +218,9 @@ if order == 3
                 mu_npmpp = Pi(omega1(n),kappa(n), omega1(m),kappa(m), omega1(p),kappa(p), ...
                     gamma_nm,G_nm,F_nm, gamma_np,G_np,F_np, gamma_mp,G_mp,F_mp, F_npmpp,kappa_npmpp, g,h);
 
-                Z_npmpp = 2 * (A_npmpp - 1i*B_npmpp) * exp(-1i * omega_npmpp * t); % Factor 2 matches MF12/new
-                spec_eta = add_to_spec(spec_eta, kx_npmpp, ky_npmpp, Z_npmpp * G_npmpp);
-                spec_phi = add_to_spec(spec_phi, kx_npmpp, ky_npmpp, Z_npmpp * mu_npmpp * (-1i));
+                Z_npmpp = 2 * (A_npmpp + 1i*B_npmpp) * exp(-1i * omega_npmpp * t); % Factor 2 matches MF12/new
+                add_to_spec(kx_npmpp, ky_npmpp, Z_npmpp * G_npmpp, 'eta');
+                add_to_spec(kx_npmpp, ky_npmpp, Z_npmpp * mu_npmpp * (1i), 'phi');
             end
         end
     end
@@ -247,25 +247,67 @@ phiS = phi_wave + Ux*X + Uy*Y;
         [~, ~, ~, kappa_out, alpha_out, gamma_out, beta_out, F_out, G_out, ~] = pair_terms(1, n, m);
     end
 
-    function spec = add_to_spec(spec, kx_in, ky_in, values)
-        idx_x = mod(round(kx_in ./ dkx), Nx) + 1;
-        idx_y = mod(round(ky_in ./ dky), Ny) + 1;
-
-        idx_x = idx_x(:);
-        idx_y = idx_y(:);
+    function add_to_spec(kx_in, ky_in, values, which_field)
+        ux = (kx_in(:) / dkx);
+        uy = (ky_in(:) / dky);
         vals = values(:);
-        valid = isfinite(idx_x) & isfinite(idx_y) & isfinite(vals);
-        if ~all(valid)
-            idx_x = idx_x(valid);
-            idx_y = idx_y(valid);
-            vals = vals(valid);
-        end
+
+        valid = isfinite(ux) & isfinite(uy) & isfinite(vals);
+        ux = ux(valid);
+        uy = uy(valid);
+        vals = vals(valid);
         if isempty(vals)
             return;
         end
+
+        ix0 = floor(ux);
+        iy0 = floor(uy);
+        fx = ux - ix0;
+        fy = uy - iy0;
+
+        % Keep exact-grid points exact to avoid tiny floating-point leakage.
+        tol = 1e-12;
+        fx(abs(fx) < tol) = 0;
+        fy(abs(fy) < tol) = 0;
+        fx(abs(fx-1) < tol) = 1;
+        fy(abs(fy-1) < tol) = 1;
+
+        ix1 = ix0 + 1;
+        iy1 = iy0 + 1;
+
+        idx_x00 = mod(ix0, Nx) + 1;
+        idx_y00 = mod(iy0, Ny) + 1;
+        idx_x10 = mod(ix1, Nx) + 1;
+        idx_y10 = idx_y00;
+        idx_x01 = idx_x00;
+        idx_y01 = mod(iy1, Ny) + 1;
+        idx_x11 = idx_x10;
+        idx_y11 = idx_y01;
+
+        w00 = (1-fx).*(1-fy);
+        w10 = fx.*(1-fy);
+        w01 = (1-fx).*fy;
+        w11 = fx.*fy;
+
+        idx_x = [idx_x00; idx_x10; idx_x01; idx_x11];
+        idx_y = [idx_y00; idx_y10; idx_y01; idx_y11];
+        vals4 = [vals.*w00; vals.*w10; vals.*w01; vals.*w11];
+
+        nz = (abs(vals4) > 0);
+        idx_x = idx_x(nz);
+        idx_y = idx_y(nz);
+        vals4 = vals4(nz);
+        if isempty(vals4)
+            return;
+        end
+
         lin = sub2ind([Ny, Nx], idx_y, idx_x);
-        addv = accumarray(lin, vals, [Ny*Nx, 1]);
-        spec = spec + reshape(addv, [Ny, Nx]);
+        addv = accumarray(lin, vals4, [Ny*Nx, 1]);
+        if strcmp(which_field, 'eta')
+            spec_eta = spec_eta + reshape(addv, [Ny, Nx]);
+        else
+            spec_phi = spec_phi + reshape(addv, [Ny, Nx]);
+        end
     end
 end
 
