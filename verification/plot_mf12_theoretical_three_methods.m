@@ -1,4 +1,8 @@
 clc; clear; close all;
+scriptDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(scriptDir);
+outDir = fullfile(rootDir, 'outputs');
+if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 % Theoretical end-to-end comparison (no hardware timing):
 %   Direct   = coeffsMF12 + surfaceMF12_new
@@ -132,7 +136,7 @@ text(ax2, 0.97, 0.95, '(b)', 'Units', 'normalized', 'HorizontalAlignment', 'righ
     'FontWeight', 'bold', 'BackgroundColor', 'w', 'Margin', 1);
 
 ts = datestr(now, 'yyyymmdd_HHMMSS');
-out_png = ['mf12_theory_three_methods_' ts '.png'];
+out_png = fullfile(outDir, ['mf12_theory_three_methods_' ts '.png']);
 exportgraphics(fig, out_png, 'Resolution', 600);
 
 fprintf('Saved figure: %s\n', out_png);

@@ -6,21 +6,30 @@ This repository contains MATLAB scripts for generating and comparing nonlinear w
 
 ```text
 .
-|- compare_crossing_sea_methods.m        # Main comparison workflow (3rd-order methods)
+|- verification/                         # Validation/benchmark/plot scripts
+|  |- compare_crossing_sea_methods.m
+|  |- benchmark_mf12_direct_vs_spectral.m
+|  |- benchmark_mf12_speed_memory.m
+|  |- plot_mf12_theoretical_complexity_memory.m
+|  |- plot_mf12_theoretical_three_methods.m
+|  |- plot_phi3_direct_vs_spectral.m
+|  |- plot_phi3_wavegroup_lines.m
+|  `- plot_eta_wavegroup_lines.m
+|- outputs/                              # Generated CSV/MAT/PNG/log outputs
+|  |- figures/
+|  `- processed_eta33/
 |- generate_crossing_sea.m               # Crossing-sea case generation
-|- benchmark_mf12_direct_vs_spectral.m   # Direct vs spectral speed/error benchmark
-|- benchmark_mf12_speed_memory.m         # Multi-method speed/memory benchmark
-|- plot_mf12_theoretical_complexity_memory.m  # End-to-end theory: direct vs spectral (time+memory)
-|- plot_mf12_theoretical_three_methods.m      # Theory: direct vs spectral vs streaming
-|- plot_phi3_direct_vs_spectral.m        # 2D phi(3rd) direct vs spectral comparison
-|- plot_phi3_wavegroup_lines.m           # Crossing-sea wave-group phi_s harmonic decomposition plots
-|- plot_eta_wavegroup_lines.m            # Crossing-sea wave-group eta harmonic decomposition plots
 |- analytic2D.m / compute_kxky.m         # Utility functions
 |- my2nd_directional_generator.m         # Directional wave generator utility
 |- irregularWavesMF12/                   # MF12 library (source + examples)
-|- figures/                              # Generated figures (ignored by git)
-`- processed_eta33/                      # Generated processed data (ignored by git)
+`- README.md
 ```
+
+## Folder Convention
+
+- Put validation, benchmark, and plotting scripts in `verification/`.
+- Put generated outputs (`.csv/.mat/.png/.log`) in `outputs/`.
+- Scripts in `verification/` are written to resolve paths from script location, so they can be run directly without switching MATLAB working directory.
 
 ## Requirements
 
@@ -39,7 +48,7 @@ rehash toolboxcache;
 generate_crossing_sea;
 
 % Run main method comparison
-compare_crossing_sea_methods;
+run('verification/compare_crossing_sea_methods.m');
 ```
 
 ## Benchmark Commands
@@ -48,29 +57,29 @@ From repository root:
 
 ```matlab
 % 1) Direct MF12 summation vs spectral reconstruction
-benchmark_mf12_direct_vs_spectral;
+run('verification/benchmark_mf12_direct_vs_spectral.m');
 
 % 2) Multi-method benchmark (wrapper/streaming/spectral variants)
-benchmark_mf12_speed_memory;
+run('verification/benchmark_mf12_speed_memory.m');
 
 % 3) Theory figures (no hardware timing dependence)
-plot_mf12_theoretical_complexity_memory;
-plot_mf12_theoretical_three_methods;
+run('verification/plot_mf12_theoretical_complexity_memory.m');
+run('verification/plot_mf12_theoretical_three_methods.m');
 
 % 4) Third-order phi comparison figures
-plot_phi3_direct_vs_spectral;
-plot_phi3_wavegroup_lines;
+run('verification/plot_phi3_direct_vs_spectral.m');
+run('verification/plot_phi3_wavegroup_lines.m');
 
 % 5) Matching eta decomposition figures
-plot_eta_wavegroup_lines;
+run('verification/plot_eta_wavegroup_lines.m');
 ```
 
 ## Harmonic Decomposition Figures
 
-- `plot_phi3_wavegroup_lines.m` now generates two fixed paper-ready PNG files:
+- `verification/plot_phi3_wavegroup_lines.m` now generates two fixed paper-ready PNG files in `outputs/`:
   - `mf12_phi3_wavegroup_lines_comparison_pub.png`
   - `mf12_phi3_wavegroup_lines_error_pub.png`
-- `plot_eta_wavegroup_lines.m` generates:
+- `verification/plot_eta_wavegroup_lines.m` generates in `outputs/`:
   - `mf12_eta_wavegroup_lines_comparison_pub.png`
   - `mf12_eta_wavegroup_lines_error_pub.png`
 
@@ -91,11 +100,11 @@ Both scripts use crossing-sea wave-group components and provide:
 
 - Source code (`*.m`) is tracked.
 - Logs and generated outputs are ignored via `.gitignore`, including:
-  - `compare_log.txt`
-  - `run_output.txt`
-  - `figures/`
-  - `processed_eta33/`
-  - root-level generated comparison PNG files
+  - `outputs/compare_log.txt`
+  - `outputs/run_output.txt`
+  - `outputs/figures/`
+  - `outputs/processed_eta33/`
+  - generated PNG/CSV/MAT/log under `outputs/`
 
 If you want to keep selected figures in GitHub, move them to a dedicated folder (for example `docs/images/`) and remove that folder from `.gitignore`.
 

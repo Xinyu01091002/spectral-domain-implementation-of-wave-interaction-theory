@@ -1,4 +1,8 @@
 clc; clear; close all;
+scriptDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(scriptDir);
+outDir = fullfile(rootDir, 'outputs');
+if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 % End-to-end theoretical scaling model:
 %   Direct   : coeffsMF12 (full) + surfaceMF12_new
@@ -157,7 +161,7 @@ text(ax2, 0.97, 0.95, '(b)', 'Units', 'normalized', 'FontName', 'Times New Roman
     'BackgroundColor', 'w', 'Margin', 1);
 
 ts = datestr(now, 'yyyymmdd_HHMMSS');
-out_png = ['mf12_theoretical_complexity_memory_pub_' ts '.png'];
+out_png = fullfile(outDir, ['mf12_theoretical_complexity_memory_pub_' ts '.png']);
 
 exportgraphics(fig, out_png, 'Resolution', 600);
 

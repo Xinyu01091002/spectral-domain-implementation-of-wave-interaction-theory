@@ -19,6 +19,7 @@ desktop.ini
 compare_log.txt
 run_output.txt
 processed_eta33/
+outputs/
 
 # Generated figures and verification images
 figures/

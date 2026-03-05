@@ -1,5 +1,9 @@
 clc;clear ;close all;
-addpath(genpath(fullfile(pwd, 'irregularWavesMF12')));
+scriptDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(scriptDir);
+addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+outDir = fullfile(rootDir, 'outputs');
+if ~exist(outDir, 'dir'), mkdir(outDir); end
 rehash toolboxcache;
 
 
@@ -9,7 +13,7 @@ rehash toolboxcache;
 
 try
     fprintf('--- Starting Comparison Script ---\n');
-    diary('compare_log.txt');
+    diary(fullfile(outDir, 'compare_log.txt'));
     diary on;
     % 1. Basic Physics & Grid Setup
 g = 9.81;
@@ -284,7 +288,7 @@ try
     title(sprintf('Diff 3rd Term (Max: %.2e)', max_diff));
     xlabel('x'); ylabel('y'); axis equal; xlim([0 Lx]); ylim([0 Ly]);
 
-    saveas(gcf, 'compare_3rd_order_crossing_full.png');
+    saveas(gcf, fullfile(outDir, 'compare_3rd_order_crossing_full.png'));
     fprintf('Saved figure compare_3rd_order_crossing_full.png\n');
 
     % --- New Plot: Centerline & Diagonal Comparison ---
@@ -327,7 +331,7 @@ try
     title('Diagonal Profile (3rd Order Term) (0,0) to (Lx, Ly)');
     xlabel('Distance along diagonal / \lambda'); ylabel('\eta^{(33)} [m]');
     
-    saveas(gcf, 'compare_3rd_order_crossing_lines.png');
+    saveas(gcf, fullfile(outDir, 'compare_3rd_order_crossing_lines.png'));
     fprintf('Saved figure compare_3rd_order_crossing_lines.png\n');
     
     % --- New Plot: 2nd Order Comparison ---
@@ -350,7 +354,7 @@ try
     title(sprintf('Diff 2nd (Max: %.2e)', max_diff_2nd_sup));
     xlabel('x'); ylabel('y'); axis equal; xlim([0 Lx]); ylim([0 Ly]);
     
-    saveas(gcf, 'compare_2nd_order_verification.png');
+    saveas(gcf, fullfile(outDir, 'compare_2nd_order_verification.png'));
     fprintf('Saved figure compare_2nd_order_verification.png\n');
     
     % --- New Plot: Centerline & Diagonal Comparison (2nd Order) ---
@@ -388,7 +392,7 @@ try
     title('Diagonal Profile (2nd Order Term) (0,0) to (Lx, Ly)');
     xlabel('Distance along diagonal / \lambda'); ylabel('\eta^{(2)} [m]');
     
-    saveas(gcf, 'compare_2nd_order_crossing_lines.png');
+    saveas(gcf, fullfile(outDir, 'compare_2nd_order_crossing_lines.png'));
     fprintf('Saved figure compare_2nd_order_crossing_lines.png\n');
     
     % --- New Plot: Total Nonlinear Surface Comparison (Full vs Modified) ---
@@ -422,7 +426,7 @@ try
     title('Diagonal Profile (Total Surface) (0,0) to (Lx, Ly)');
     xlabel('Distance along diagonal / \lambda'); ylabel('\eta_{total} [m]');
     
-    saveas(gcf, 'compare_total_surface_lines.png');
+    saveas(gcf, fullfile(outDir, 'compare_total_surface_lines.png'));
     fprintf('Saved figure compare_total_surface_lines.png\n');
     
     % --- New Plot: 1st Order (Linear) Comparison ---
@@ -454,7 +458,7 @@ try
     title('Diagonal Profile (1st Order Linear) (0,0) to (Lx, Ly)');
     xlabel('Distance along diagonal / \lambda'); ylabel('\eta^{(1)} [m]');
     
-    saveas(gcf, 'compare_1st_order_lines.png');
+    saveas(gcf, fullfile(outDir, 'compare_1st_order_lines.png'));
     fprintf('Saved figure compare_1st_order_lines.png\n');
     
 catch ME
@@ -462,4 +466,4 @@ catch ME
 end
 
 
-catch ME_outer; fid = fopen('compare_fatal_error.txt','w'); fprintf(fid, 'Fatal Error: %s\n', ME_outer.message); fclose(fid); exit(1); end
+catch ME_outer; fid = fopen(fullfile(outDir, 'compare_fatal_error.txt'),'w'); fprintf(fid, 'Fatal Error: %s\n', ME_outer.message); fclose(fid); exit(1); end

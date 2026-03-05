@@ -1,5 +1,9 @@
 clc; clear; close all;
-addpath(genpath(fullfile(pwd, 'irregularWavesMF12')));
+scriptDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(scriptDir);
+addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+outDir = fullfile(rootDir, 'outputs');
+if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 % Config
 g = 9.81;
@@ -98,7 +102,6 @@ imagesc(x, y, d_term); axis image; set(gca, 'YDir', 'normal');
 title(sprintf('Diff pure-3rd (max %.2e)', max_term));
 xlabel('x'); ylabel('y'); colorbar;
 
-out_png = ['phi3_direct_vs_spectral_' datestr(now, 'yyyymmdd_HHMMSS') '.png'];
+out_png = fullfile(outDir, ['phi3_direct_vs_spectral_' datestr(now, 'yyyymmdd_HHMMSS') '.png']);
 saveas(fig, out_png);
 fprintf('Saved: %s\n', out_png);
-

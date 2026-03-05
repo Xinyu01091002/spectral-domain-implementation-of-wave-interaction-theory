@@ -1,5 +1,9 @@
 clc; clear; close all;
-addpath(genpath(fullfile(pwd, 'irregularWavesMF12')));
+scriptDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(scriptDir);
+addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+outDir = fullfile(rootDir, 'outputs');
+if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 cfg.g = 9.81;
 cfg.h = 100;
@@ -111,8 +115,8 @@ T = struct2table(rows);
 disp(T);
 
 ts = datestr(now, 'yyyymmdd_HHMMSS');
-csv_name = ['benchmark_direct_vs_spectral_' ts '.csv'];
-mat_name = ['benchmark_direct_vs_spectral_' ts '.mat'];
+csv_name = fullfile(outDir, ['benchmark_direct_vs_spectral_' ts '.csv']);
+mat_name = fullfile(outDir, ['benchmark_direct_vs_spectral_' ts '.mat']);
 
 writetable(T, csv_name);
 save(mat_name, 'T', 'rows', 'cfg', 'case_matrix');
@@ -148,7 +152,7 @@ title('Max |eta_{direct}-eta_{spectral}|');
 ylabel('log scale');
 xticklabels("N="+string(T.N));
 
-png_name = ['benchmark_direct_vs_spectral_' ts '.png'];
+png_name = fullfile(outDir, ['benchmark_direct_vs_spectral_' ts '.png']);
 saveas(fig, png_name);
 
 fprintf('\nSaved: %s\n', csv_name);

@@ -1,5 +1,9 @@
 clc; clear; close all;
-addpath(genpath(fullfile(pwd, 'irregularWavesMF12')));
+scriptDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(scriptDir);
+addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+outDir = fullfile(rootDir, 'outputs');
+if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 cfg.g = 9.81;
 cfg.h = 100;
@@ -139,9 +143,9 @@ T = struct2table(rows);
 disp(T);
 
 ts = datestr(now, 'yyyymmdd_HHMMSS');
-csv_name = ['benchmark_mf12_speed_memory_' ts '.csv'];
-mat_name = ['benchmark_mf12_speed_memory_' ts '.mat'];
-png_name = ['benchmark_mf12_speed_memory_' ts '.png'];
+csv_name = fullfile(outDir, ['benchmark_mf12_speed_memory_' ts '.csv']);
+mat_name = fullfile(outDir, ['benchmark_mf12_speed_memory_' ts '.mat']);
+png_name = fullfile(outDir, ['benchmark_mf12_speed_memory_' ts '.png']);
 
 writetable(T, csv_name);
 save(mat_name, 'T', 'rows', 'cfg', 'case_matrix');

@@ -52,6 +52,33 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     Ux = coeffs.Ux;
     Uy = coeffs.Uy;
     superOnly = isfield(coeffs, 'superharmonic_only') && coeffs.superharmonic_only;
+
+    % Third-order subharmonic handling policy.
+    % Supported values (optional coeffs field):
+    %   coeffs.third_order_subharmonic_mode = 'auto' | 'include' | 'skip'
+    % Default is 'auto', which skips third-order subharmonics in wave-group-like
+    % or near-resonant conditions to avoid coefficient blow-up.
+    mode3 = 'auto';
+    if isfield(coeffs, 'third_order_subharmonic_mode')
+        v = lower(string(coeffs.third_order_subharmonic_mode));
+        if v == "include" || v == "skip" || v == "auto"
+            mode3 = char(v);
+        end
+    end
+
+    [waveGroupLike, nearResonant] = detect_wavegroup_or_resonance(coeffs);
+    if strcmp(mode3, 'include')
+        skip3Sub = false;
+    elseif strcmp(mode3, 'skip')
+        skip3Sub = true;
+    else
+        % Auto-safe mode: skip third-order subharmonics for wave-groups/near-resonance.
+        skip3Sub = waveGroupLike || nearResonant;
+    end
+    if progress_enabled && skip3Sub
+        fprintf('surfaceMF12_spectral: skipping 3rd-order subharmonics (mode=%s, waveGroup=%d, nearRes=%d)\n', ...
+            mode3, waveGroupLike, nearResonant);
+    end
     
     % --- 1. First Order Terms ---
     % eta = sum( a*cos(theta) + b*sin(theta) )
@@ -200,9 +227,12 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         if superOnly
             mask = true(len_coeffs, 1);
         else
-            % Full: coeffsMF12 stores [Sum, Diff, Sum, Diff...] for pm=[1, -1].
-            % Keep only pm=1 (superharmonics), matching surfaceMF12_new behavior.
-            mask = 1:2:len_coeffs;
+            if skip3Sub
+                % Full coeffs store [pm=+1, pm=-1, ...]. Keep pm=+1 only.
+                mask = 1:2:len_coeffs;
+            else
+                mask = true(len_coeffs, 1);
+            end
         end
 
         Z_np2m = (coeffs.A_np2m(mask) + 1i*coeffs.B_np2m(mask)) .* exp(-1i * coeffs.omega_np2m(mask) * t);
@@ -224,7 +254,11 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         if superOnly
             mask = true(len_coeffs, 1);
         else
-            mask = 1:2:len_coeffs;
+            if skip3Sub
+                mask = 1:2:len_coeffs; % keep pm=+1 only
+            else
+                mask = true(len_coeffs, 1);
+            end
         end
         
         Z_2npm = (coeffs.A_2npm(mask) + 1i*coeffs.B_2npm(mask)) .* exp(-1i * coeffs.omega_2npm(mask) * t);
@@ -252,25 +286,28 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         if superOnly
             mask = true(len_coeffs, 1);
         else
-            % Reconstruct indices for pmm=1 && pmp=1
-             idx = 0;
-             mask_log = false(len_coeffs, 1);
-            
-             for n = 1:N_c
-                for m = n+1:N_c
-                    for pmm = [1 -1]
-                        for p = m+1:N_c
-                            for pmp = [1 -1]
-                                idx = idx + 1;
-                                if pmm == 1 && pmp == 1
-                                    mask_log(idx) = true;
+            if skip3Sub
+                % Keep only pmm=+1, pmp=+1 branch (superharmonic +++).
+                idx = 0;
+                mask_log = false(len_coeffs, 1);
+                for n = 1:N_c
+                    for m = n+1:N_c
+                        for pmm = [1 -1]
+                            for p = m+1:N_c
+                                for pmp = [1 -1]
+                                    idx = idx + 1;
+                                    if pmm == 1 && pmp == 1
+                                        mask_log(idx) = true;
+                                    end
                                 end
                             end
                         end
                     end
                 end
-             end
-             mask = mask_log;
+                mask = mask_log;
+            else
+                mask = true(len_coeffs, 1);
+            end
         end
         
         Z_npmpp = (coeffs.A_npmpp(mask) + 1i*coeffs.B_npmpp(mask)) .* exp(-1i * coeffs.omega_npmpp(mask) * t);
@@ -384,6 +421,72 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
             phi_idx_x = [phi_idx_x; idx_x];
             phi_idx_y = [phi_idx_y; idx_y];
             phi_vals = [phi_vals; vals4];
+        end
+    end
+
+    function [isWG, isNearRes] = detect_wavegroup_or_resonance(c)
+        % Heuristic flags to identify cases where third-order subharmonics
+        % tend to become stiff/ill-conditioned in practice.
+        isWG = false;
+        isNearRes = false;
+
+        try
+            if isfield(c, 'kappa') && ~isempty(c.kappa) && isfield(c, 'kx') && isfield(c, 'ky')
+                kap = c.kappa(:);
+                kap = kap(isfinite(kap) & kap > 0);
+                if ~isempty(kap)
+                    cv_k = std(kap) / max(mean(kap), eps); % narrow-band indicator
+                    th = atan2(c.ky(:), c.kx(:));
+                    R = abs(mean(exp(1i*th)));
+                    circ_std = sqrt(max(0, -2*log(max(R, eps)))); % radians
+                    isWG = (cv_k < 0.22) && (circ_std < deg2rad(20));
+                end
+            end
+
+            % Near-resonance indicators for third-order subharmonic branches
+            if isfield(c, 'omega') && ~isempty(c.omega)
+                w_ref = median(abs(c.omega(:)));
+                if ~isfinite(w_ref) || w_ref <= 0, w_ref = 1; end
+                w_tol = max(1e-10, 1e-3*w_ref);
+
+                resFlags = false(3,1);
+                if isfield(c, 'omega_np2m') && numel(c.omega_np2m) >= 2
+                    w = c.omega_np2m(2:2:end); % pm=-1 branch in full coeffs
+                    resFlags(1) = any(isfinite(w) & abs(w) < w_tol);
+                end
+                if isfield(c, 'omega_2npm') && numel(c.omega_2npm) >= 2
+                    w = c.omega_2npm(2:2:end); % pm=-1 branch in full coeffs
+                    resFlags(2) = any(isfinite(w) & abs(w) < w_tol);
+                end
+                if isfield(c, 'omega_npmpp') && isfield(c, 'N')
+                    w = c.omega_npmpp(:);
+                    if ~isempty(w) && isscalar(c.N) && c.N >= 3
+                        % Any near-zero frequency in non-+++ branches.
+                        idx = 0; subMask = false(numel(w),1);
+                        for n = 1:c.N
+                            for m = n+1:c.N
+                                for pmm = [1 -1]
+                                    for p = m+1:c.N
+                                        for pmp = [1 -1]
+                                            idx = idx + 1;
+                                            if ~(pmm == 1 && pmp == 1)
+                                                subMask(idx) = true;
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        ww = w(subMask);
+                        resFlags(3) = any(isfinite(ww) & abs(ww) < w_tol);
+                    end
+                end
+                isNearRes = any(resFlags);
+            end
+        catch
+            % Fall back to conservative behavior (do not flag).
+            isWG = false;
+            isNearRes = false;
         end
     end
 
