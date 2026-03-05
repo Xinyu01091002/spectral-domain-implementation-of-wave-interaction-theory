@@ -1,4 +1,4 @@
-function [coeffs] = coeffsMF12_superharmonic(order,g,h,a,b,kx,ky,Ux,Uy,dispCoeffs)
+function [coeffs] = coeffsMF12_superharmonic(order,g,h,a,b,kx,ky,Ux,Uy,varargin)
 %COEFFSMF12_SUPERHARMONIC MF12 coefficients with selective interaction retention.
 %   Keeps:
 %   - Second-order self, sum, and difference interactions.
@@ -6,9 +6,36 @@ function [coeffs] = coeffsMF12_superharmonic(order,g,h,a,b,kx,ky,Ux,Uy,dispCoeff
 %   - Third-order superharmonics only: (n+2m), (2n+m), and (n+m+p).
 %
 %   Inputs match coeffsMF12.
+%
+%   Optional trailing inputs:
+%     dispCoeffs (scalar, default 0)
+%     opts (struct, optional):
+%       opts.enable_subharmonic (default false)
+%   Notes:
+%     Disk streaming/out-of-core paths are intentionally disabled in this
+%     single-workflow version; this function always computes in RAM.
 
-if nargin < 10
-    dispCoeffs = 0;
+dispCoeffs = 0;
+opts = struct();
+if ~isempty(varargin)
+    if isnumeric(varargin{1}) || islogical(varargin{1})
+        dispCoeffs = varargin{1};
+        if numel(varargin) >= 2 && isstruct(varargin{2})
+            opts = varargin{2};
+        end
+    elseif isstruct(varargin{1})
+        opts = varargin{1};
+    end
+end
+
+if ~isfield(opts, 'enable_subharmonic'), opts.enable_subharmonic = false; end
+if opts.enable_subharmonic
+    % Isolated full-subharmonic path. No subharmonic memory/compute in default mode.
+    coeffs = coeffsMF12(order,g,h,a,b,kx,ky,Ux,Uy,dispCoeffs);
+    coeffs.superharmonic_only = false;
+    coeffs.enable_subharmonic = true;
+    coeffs.opts = opts;
+    return;
 end
 
 % Ensure row vectors for consistent indexing/storage.

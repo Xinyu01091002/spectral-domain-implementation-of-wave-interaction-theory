@@ -12,8 +12,8 @@ Ux = 0;
 Uy = 0;
 Lx = 3000;
 Ly = 3000;
-Nx = 256;
-Ny = 256;
+Nx = 513;
+Ny = 513;
 t = 0.0;
 
 % Build a directional wave-group-like spectrum in k-space
@@ -54,7 +54,7 @@ W = Sk .* (w1*St1 + w2*St2);
 
 % Keep energetic modes
 [~, idx_sort] = sort(W, 'descend');
-N = 30;
+N = 60;
 idx = idx_sort(1:N);
 kx = kx_all(idx);
 ky = ky_all(idx);
@@ -144,23 +144,39 @@ c_spec = [0.82, 0.30, 0.11];
 c_err = [0.20, 0.20, 0.20];
 lw_main = 2.1;
 lw_err = 1.6;
+fs_title = 12;
+fs_axis = 11;
+fs_tick = 10;
+fs_legend = 10;
+fs_note = 9;
 
-% Global machine-precision style limits for error panels
-err_max = 0;
+% Normalize error by global max |phi_s| over all plotted traces
+phi_ref_max = 0;
 for j = 1:4
-    err_max = max(err_max, max(abs(center_d{j} - center_s{j})));
-    err_max = max(err_max, max(abs(diag_d{j} - diag_s{j})));
+    phi_ref_max = max(phi_ref_max, max(abs(center_d{j})));
+    phi_ref_max = max(phi_ref_max, max(abs(center_s{j})));
+    phi_ref_max = max(phi_ref_max, max(abs(diag_d{j})));
+    phi_ref_max = max(phi_ref_max, max(abs(diag_s{j})));
 end
-if err_max <= 0
-    err_ylim = 1e-12;
+phi_ref_max = max(phi_ref_max, eps);
+
+% Global limits for normalized error panels
+errn_max = 0;
+for j = 1:4
+    errn_max = max(errn_max, max(abs((center_d{j} - center_s{j}) / phi_ref_max)));
+    errn_max = max(errn_max, max(abs((diag_d{j} - diag_s{j}) / phi_ref_max)));
+end
+if errn_max <= 0
+    err_ylim = 1e-14;
 else
-    err_ylim = 10^(ceil(log10(err_max)));
+    err_ylim = 10^(ceil(log10(errn_max)));
     err_ylim = max(err_ylim, 1e-14);
 end
+eps_ref = eps(1.0);
 
 % -------- Figure 1: Direct vs Spectral lines --------
-fig1 = figure('Color','w','Units','centimeters','Position',[2 2 24 10.8]);
-tiledlayout(2,4, 'Padding', 'compact', 'TileSpacing', 'compact');
+fig1 = figure('Color','w','Units','centimeters','Position',[2 2 26 11.2]);
+tl1 = tiledlayout(2,4, 'Padding', 'compact', 'TileSpacing', 'compact');
 
 for j = 1:4
     ax = nexttile;
@@ -168,17 +184,18 @@ for j = 1:4
     h2 = plot(ax, xn, center_s{j}, '--', 'Color', c_spec, 'LineWidth', lw_main);
     grid(ax, 'on'); grid(ax, 'minor');
     xlim(ax, xwin_n);
-    title(ax, labels{j}, 'FontName', 'Times New Roman', 'FontSize', 10, 'FontWeight', 'normal');
+    title(ax, labels{j}, 'FontName', 'Times New Roman', 'FontSize', fs_title, 'FontWeight', 'normal');
     if j == 1
-        ylabel(ax, 'Centerline \phi_s (m^2/s)', 'FontName', 'Times New Roman', 'FontSize', 10);
+        ylabel(ax, 'Centerline \phi_s (m^2/s)', 'FontName', 'Times New Roman', 'FontSize', fs_axis);
         legend(ax, [h1, h2], {'Direct', 'Spectral'}, 'Location', 'northwest', ...
-            'FontName', 'Times New Roman', 'FontSize', 8, 'Box', 'off');
+            'FontName', 'Times New Roman', 'FontSize', fs_legend, 'Box', 'off');
         yl = ylim(ax); d = max(eps, yl(2)-yl(1)); ylim(ax, [yl(1)-0.10*d, yl(2)+0.22*d]);
     else
         yl = ylim(ax); d = max(eps, yl(2)-yl(1)); ylim(ax, [yl(1)-0.08*d, yl(2)+0.12*d]);
     end
-    set(ax, 'FontName', 'Times New Roman', 'FontSize', 9, 'LineWidth', 0.8, 'Box', 'on');
-    xlabel(ax, 'x/\lambda_p', 'FontName', 'Times New Roman', 'FontSize', 10);
+    set(ax, 'FontName', 'Times New Roman', 'FontSize', fs_tick, 'LineWidth', 0.8, 'Box', 'on');
+    ax.GridAlpha = 0.20; ax.MinorGridAlpha = 0.10;
+    if j <= 4, ax.XTickLabel = []; end
 end
 
 for j = 1:4
@@ -188,57 +205,66 @@ for j = 1:4
     grid(ax, 'on'); grid(ax, 'minor');
     xlim(ax, swin_n);
     if j == 1
-        ylabel(ax, 'Diagonal \phi_s (m^2/s)', 'FontName', 'Times New Roman', 'FontSize', 10);
+        ylabel(ax, 'Diagonal \phi_s (m^2/s)', 'FontName', 'Times New Roman', 'FontSize', fs_axis);
         legend(ax, [h1, h2], {'Direct', 'Spectral'}, 'Location', 'northwest', ...
-            'FontName', 'Times New Roman', 'FontSize', 8, 'Box', 'off');
+            'FontName', 'Times New Roman', 'FontSize', fs_legend, 'Box', 'off');
         yl = ylim(ax); d = max(eps, yl(2)-yl(1)); ylim(ax, [yl(1)-0.10*d, yl(2)+0.22*d]);
     else
         yl = ylim(ax); d = max(eps, yl(2)-yl(1)); ylim(ax, [yl(1)-0.08*d, yl(2)+0.12*d]);
     end
-    set(ax, 'FontName', 'Times New Roman', 'FontSize', 9, 'LineWidth', 0.8, 'Box', 'on');
-    xlabel(ax, 'x/\lambda_p', 'FontName', 'Times New Roman', 'FontSize', 10);
+    set(ax, 'FontName', 'Times New Roman', 'FontSize', fs_tick, 'LineWidth', 0.8, 'Box', 'on');
+    ax.GridAlpha = 0.20; ax.MinorGridAlpha = 0.10;
 end
+xlabel(tl1, 'x/\lambda_p', 'FontName', 'Times New Roman', 'FontSize', fs_axis);
 
 out_cmp = fullfile(outDir, 'mf12_phi3_wavegroup_lines_comparison_pub.png');
 exportgraphics(fig1, out_cmp, 'Resolution', 600);
 fprintf('Saved: %s\n', out_cmp);
 
 % -------- Figure 2: Error-only panels --------
-fig2 = figure('Color','w','Units','centimeters','Position',[2 2 24 10.8]);
-tiledlayout(2,4, 'Padding', 'compact', 'TileSpacing', 'compact');
+fig2 = figure('Color','w','Units','centimeters','Position',[2 2 26 11.2]);
+tl2 = tiledlayout(2,4, 'Padding', 'compact', 'TileSpacing', 'compact');
 
 for j = 1:4
     ax = nexttile;
-    e = center_d{j} - center_s{j};
+    e = (center_d{j} - center_s{j}) / phi_ref_max;
     plot(ax, xn, e, '-', 'Color', c_err, 'LineWidth', lw_err); hold(ax, 'on');
     yline(ax, 0, ':', 'Color', [0.55 0.55 0.55], 'LineWidth', 1.0);
+    yline(ax, eps_ref, '--', 'Color', [0.25 0.55 0.25], 'LineWidth', 0.9);
+    yline(ax, -eps_ref, '--', 'Color', [0.25 0.55 0.25], 'LineWidth', 0.9);
     grid(ax, 'on'); grid(ax, 'minor');
     xlim(ax, xwin_n); ylim(ax, [-err_ylim, err_ylim]);
-    title(ax, labels{j}, 'FontName', 'Times New Roman', 'FontSize', 10, 'FontWeight', 'normal');
+    title(ax, labels{j}, 'FontName', 'Times New Roman', 'FontSize', fs_title, 'FontWeight', 'normal');
     if j == 1
-        ylabel(ax, 'Centerline error \Delta\phi_s (m^2/s)', 'FontName', 'Times New Roman', 'FontSize', 10);
+        ylabel(ax, 'Centerline \Delta\phi_s / max|\phi_s|', 'FontName', 'Times New Roman', 'FontSize', fs_axis);
     end
-    set(ax, 'FontName', 'Times New Roman', 'FontSize', 9, 'LineWidth', 0.8, 'Box', 'on');
-    xlabel(ax, 'x/\lambda_p', 'FontName', 'Times New Roman', 'FontSize', 10);
+    set(ax, 'FontName', 'Times New Roman', 'FontSize', fs_tick, 'LineWidth', 0.8, 'Box', 'on');
+    ax.GridAlpha = 0.20; ax.MinorGridAlpha = 0.10;
+    if j <= 4, ax.XTickLabel = []; end
     text(ax, 0.97, 0.90, sprintf('max=%.1e', max(abs(e))), 'Units', 'normalized', ...
-        'HorizontalAlignment', 'right', 'FontName', 'Times New Roman', 'FontSize', 8, 'BackgroundColor', 'w');
+        'HorizontalAlignment', 'right', 'FontName', 'Times New Roman', 'FontSize', fs_note, 'BackgroundColor', 'w');
 end
 
 for j = 1:4
     ax = nexttile;
-    e = diag_d{j} - diag_s{j};
+    e = (diag_d{j} - diag_s{j}) / phi_ref_max;
     plot(ax, sn, e, '-', 'Color', c_err, 'LineWidth', lw_err); hold(ax, 'on');
     yline(ax, 0, ':', 'Color', [0.55 0.55 0.55], 'LineWidth', 1.0);
+    yline(ax, eps_ref, '--', 'Color', [0.25 0.55 0.25], 'LineWidth', 0.9);
+    yline(ax, -eps_ref, '--', 'Color', [0.25 0.55 0.25], 'LineWidth', 0.9);
     grid(ax, 'on'); grid(ax, 'minor');
     xlim(ax, swin_n); ylim(ax, [-err_ylim, err_ylim]);
     if j == 1
-        ylabel(ax, 'Diagonal error \Delta\phi_s (m^2/s)', 'FontName', 'Times New Roman', 'FontSize', 10);
+        ylabel(ax, 'Diagonal \Delta\phi_s / max|\phi_s|', 'FontName', 'Times New Roman', 'FontSize', fs_axis);
     end
-    set(ax, 'FontName', 'Times New Roman', 'FontSize', 9, 'LineWidth', 0.8, 'Box', 'on');
-    xlabel(ax, 'x/\lambda_p', 'FontName', 'Times New Roman', 'FontSize', 10);
+    set(ax, 'FontName', 'Times New Roman', 'FontSize', fs_tick, 'LineWidth', 0.8, 'Box', 'on');
+    ax.GridAlpha = 0.20; ax.MinorGridAlpha = 0.10;
     text(ax, 0.97, 0.90, sprintf('max=%.1e', max(abs(e))), 'Units', 'normalized', ...
-        'HorizontalAlignment', 'right', 'FontName', 'Times New Roman', 'FontSize', 8, 'BackgroundColor', 'w');
+        'HorizontalAlignment', 'right', 'FontName', 'Times New Roman', 'FontSize', fs_note, 'BackgroundColor', 'w');
 end
+xlabel(tl2, 'x/\lambda_p', 'FontName', 'Times New Roman', 'FontSize', fs_axis);
+fprintf('Normalized error reference max|phi_s| = %.3e\n', phi_ref_max);
+fprintf('Machine epsilon reference (double) = %.3e\n', eps_ref);
 
 out_err = fullfile(outDir, 'mf12_phi3_wavegroup_lines_error_pub.png');
 exportgraphics(fig2, out_err, 'Resolution', 600);

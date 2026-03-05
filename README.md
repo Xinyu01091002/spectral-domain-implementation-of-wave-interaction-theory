@@ -9,12 +9,16 @@ This repository contains MATLAB scripts for generating and comparing nonlinear w
 |- verification/                         # Validation/benchmark/plot scripts
 |  |- compare_crossing_sea_methods.m
 |  |- benchmark_mf12_direct_vs_spectral.m
+|  |- benchmark_direct_vs_spectral_vsN.m
+|  |- benchmark_surface_spectral_before_after.m
+|  |- benchmark_streaming_super_scalar_fastpath.m
 |  |- benchmark_mf12_speed_memory.m
 |  |- plot_mf12_theoretical_complexity_memory.m
 |  |- plot_mf12_theoretical_three_methods.m
 |  |- plot_phi3_direct_vs_spectral.m
 |  |- plot_phi3_wavegroup_lines.m
-|  `- plot_eta_wavegroup_lines.m
+|  |- plot_eta_wavegroup_lines.m
+|  `- test_new_spectral_realistic_sea_highN.m
 |- outputs/                              # Generated CSV/MAT/PNG/log outputs
 |  |- figures/
 |  `- processed_eta33/
@@ -35,6 +39,12 @@ This repository contains MATLAB scripts for generating and comparing nonlinear w
 
 - MATLAB (recommended R2021a or newer)
 - No additional toolbox is strictly required for the included scripts
+
+## Current Workflow Policy
+
+- The active production path is **in-memory MF12 coefficient precompute + spectral reconstruction**.
+- Out-of-core / chunked coefficient storage and disk-streaming reconstruction are removed from the active workflow.
+- `surfaceMF12_spectral` is the primary reconstruction path for performance comparisons.
 
 ## Quick Start
 
@@ -59,20 +69,39 @@ From repository root:
 % 1) Direct MF12 summation vs spectral reconstruction
 run('verification/benchmark_mf12_direct_vs_spectral.m');
 
-% 2) Multi-method benchmark (wrapper/streaming/spectral variants)
+% 2) Runtime vs N (direct vs current spectral)
+run('verification/benchmark_direct_vs_spectral_vsN.m');
+
+% 3) Before/after benchmark for current spectral optimizations
+run('verification/benchmark_surface_spectral_before_after.m');
+
+% 4) Scalar-fastpath benchmark for streaming_super add_to_spec micro-optimization
+run('verification/benchmark_streaming_super_scalar_fastpath.m');
+
+% 5) Multi-method benchmark wrapper (kept for compatibility)
 run('verification/benchmark_mf12_speed_memory.m');
 
-% 3) Theory figures (no hardware timing dependence)
+% 6) Theory figures (no hardware timing dependence)
 run('verification/plot_mf12_theoretical_complexity_memory.m');
 run('verification/plot_mf12_theoretical_three_methods.m');
 
-% 4) Third-order phi comparison figures
+% 7) Third-order phi comparison figures
 run('verification/plot_phi3_direct_vs_spectral.m');
 run('verification/plot_phi3_wavegroup_lines.m');
 
-% 5) Matching eta decomposition figures
+% 8) Matching eta decomposition figures
 run('verification/plot_eta_wavegroup_lines.m');
+
+% 9) High-N realistic directional wave-group test (spectral only)
+run('verification/test_new_spectral_realistic_sea_highN.m');
 ```
+
+## Performance Notes
+
+- `surfaceMF12_spectral` now uses reduced overhead accumulation (preallocated append buffers and reused branch masks), which significantly improves runtime for large `N`.
+- For directional wave-group-like cases, use:
+  - `coeffs.third_order_subharmonic_mode = 'skip'`
+  to avoid unstable third-order subharmonic branches in spectral reconstruction.
 
 ## Harmonic Decomposition Figures
 

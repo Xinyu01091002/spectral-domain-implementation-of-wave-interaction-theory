@@ -22,6 +22,7 @@ dky = 2*pi/Ly;
 
 spec_eta = complex(zeros(Ny, Nx));
 spec_phi = complex(zeros(Ny, Nx));
+use_scalar_fast = ~strcmp(getenv('MF12_DISABLE_SCALAR_FAST'), '1');
 
 % Linear quantities.
 kappa = hypot(kx, ky);                                % Eq. 3.4
@@ -257,6 +258,49 @@ phiS = phi_wave + Ux*X + Uy*Y;
         uy = uy(valid);
         vals = vals(valid);
         if isempty(vals)
+            return;
+        end
+
+        % Fast scalar path: avoid O(Ng) accumarray for inner-loop scalar calls.
+        if use_scalar_fast && numel(vals) == 1
+            ix0 = floor(ux);
+            iy0 = floor(uy);
+            fx = ux - ix0;
+            fy = uy - iy0;
+
+            tol = 1e-12;
+            if abs(fx) < tol, fx = 0; elseif abs(fx-1) < tol, fx = 1; end
+            if abs(fy) < tol, fy = 0; elseif abs(fy-1) < tol, fy = 1; end
+
+            ix1 = ix0 + 1;
+            iy1 = iy0 + 1;
+
+            idx_x00 = mod(ix0, Nx) + 1;
+            idx_y00 = mod(iy0, Ny) + 1;
+            idx_x10 = mod(ix1, Nx) + 1;
+            idx_y10 = idx_y00;
+            idx_x01 = idx_x00;
+            idx_y01 = mod(iy1, Ny) + 1;
+            idx_x11 = idx_x10;
+            idx_y11 = idx_y01;
+
+            v = vals;
+            w00 = (1-fx)*(1-fy);
+            w10 = fx*(1-fy);
+            w01 = (1-fx)*fy;
+            w11 = fx*fy;
+
+            if strcmp(which_field, 'eta')
+                spec_eta(idx_y00, idx_x00) = spec_eta(idx_y00, idx_x00) + v*w00;
+                spec_eta(idx_y10, idx_x10) = spec_eta(idx_y10, idx_x10) + v*w10;
+                spec_eta(idx_y01, idx_x01) = spec_eta(idx_y01, idx_x01) + v*w01;
+                spec_eta(idx_y11, idx_x11) = spec_eta(idx_y11, idx_x11) + v*w11;
+            else
+                spec_phi(idx_y00, idx_x00) = spec_phi(idx_y00, idx_x00) + v*w00;
+                spec_phi(idx_y10, idx_x10) = spec_phi(idx_y10, idx_x10) + v*w10;
+                spec_phi(idx_y01, idx_x01) = spec_phi(idx_y01, idx_x01) + v*w01;
+                spec_phi(idx_y11, idx_x11) = spec_phi(idx_y11, idx_x11) + v*w11;
+            end
             return;
         end
 

@@ -1,4 +1,4 @@
-function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
+function [eta, phiS, X, Y] = surfaceMF12_spectral_baseline(coeffs, Lx, Ly, Nx, Ny, t)
 % Spectral domain implementation of the surface elevation and potential reconstruction.
 % This function is significantly faster than surfaceMF12 for large spatial fields 
 % as it utilizes FFT (O(N log N)) instead of direct summation (O(N_waves * Nx * Ny)).
@@ -40,6 +40,14 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     spec_eta = zeros(Ny, Nx); 
     spec_phi = zeros(Ny, Nx);
 
+    % Accumulators (delay accumarray to the end for speed)
+    eta_idx_x = [];
+    eta_idx_y = [];
+    eta_vals = [];
+    phi_idx_x = [];
+    phi_idx_y = [];
+    phi_vals = [];
+
     % Helper variables
     Ux = coeffs.Ux;
     Uy = coeffs.Uy;
@@ -58,91 +66,19 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         end
     end
 
-    if superOnly
-        % Superharmonic coeff sets already exclude third-order subharmonic branches.
-        waveGroupLike = false;
-        nearResonant = false;
+    [waveGroupLike, nearResonant] = detect_wavegroup_or_resonance(coeffs);
+    if strcmp(mode3, 'include')
+        skip3Sub = false;
+    elseif strcmp(mode3, 'skip')
         skip3Sub = true;
     else
-        [waveGroupLike, nearResonant] = detect_wavegroup_or_resonance(coeffs);
-        if strcmp(mode3, 'include')
-            skip3Sub = false;
-        elseif strcmp(mode3, 'skip')
-            skip3Sub = true;
-        else
-            % Auto-safe mode: skip third-order subharmonics for wave-groups/near-resonance.
-            skip3Sub = waveGroupLike || nearResonant;
-        end
+        % Auto-safe mode: skip third-order subharmonics for wave-groups/near-resonance.
+        skip3Sub = waveGroupLike || nearResonant;
     end
     if progress_enabled && skip3Sub
         fprintf('surfaceMF12_spectral: skipping 3rd-order subharmonics (mode=%s, waveGroup=%d, nearRes=%d)\n', ...
             mode3, waveGroupLike, nearResonant);
     end
-
-    % Precompute branch masks once per call (reused by multiple accumulations).
-    mask_np2m = [];
-    mask_2npm = [];
-    mask_npmpp = [];
-    if isfield(coeffs, 'G_np2m')
-        len_np2m = length(coeffs.G_np2m);
-        if superOnly
-            mask_np2m = true(len_np2m, 1);
-        elseif skip3Sub
-            mask_np2m = false(len_np2m, 1);
-            mask_np2m(1:2:len_np2m) = true;
-        else
-            mask_np2m = true(len_np2m, 1);
-        end
-    end
-    if isfield(coeffs, 'G_2npm')
-        len_2npm = length(coeffs.G_2npm);
-        if superOnly
-            mask_2npm = true(len_2npm, 1);
-        elseif skip3Sub
-            mask_2npm = false(len_2npm, 1);
-            mask_2npm(1:2:len_2npm) = true;
-        else
-            mask_2npm = true(len_2npm, 1);
-        end
-    end
-    if isfield(coeffs, 'G_npmpp')
-        len_npmpp = length(coeffs.G_npmpp);
-        if superOnly
-            mask_npmpp = true(len_npmpp, 1);
-        elseif skip3Sub
-            N_c = coeffs.N;
-            mask_npmpp = false(len_npmpp, 1);
-            idxm = 0;
-            for n = 1:N_c
-                for m = n+1:N_c
-                    for pmm = [1 -1]
-                        for p = m+1:N_c
-                            for pmp = [1 -1]
-                                idxm = idxm + 1;
-                                if pmm == 1 && pmp == 1
-                                    mask_npmpp(idxm) = true;
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        else
-            mask_npmpp = true(len_npmpp, 1);
-        end
-    end
-
-    % Preallocate accumulators to avoid repeated large reallocations.
-    nvals_est = estimate_total_values(coeffs, mask_np2m, mask_2npm, mask_npmpp);
-    cap0 = max(1024, 4 * nvals_est);
-    eta_idx_x = zeros(cap0, 1);
-    eta_idx_y = zeros(cap0, 1);
-    eta_vals = complex(zeros(cap0, 1));
-    phi_idx_x = zeros(cap0, 1);
-    phi_idx_y = zeros(cap0, 1);
-    phi_vals = complex(zeros(cap0, 1));
-    eta_count = 0;
-    phi_count = 0;
     
     % --- 1. First Order Terms ---
     % eta = sum( a*cos(theta) + b*sin(theta) )
@@ -286,7 +222,18 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     % Okay, so the sign is not the issue. The masking is.
 
     if isfield(coeffs, 'G_np2m') % Double Sum (n+2m)
-        mask = mask_np2m;
+        len_coeffs = length(coeffs.G_np2m);
+
+        if superOnly
+            mask = true(len_coeffs, 1);
+        else
+            if skip3Sub
+                % Full coeffs store [pm=+1, pm=-1, ...]. Keep pm=+1 only.
+                mask = 1:2:len_coeffs;
+            else
+                mask = true(len_coeffs, 1);
+            end
+        end
 
         Z_np2m = (coeffs.A_np2m(mask) + 1i*coeffs.B_np2m(mask)) .* exp(-1i * coeffs.omega_np2m(mask) * t);
         
@@ -302,7 +249,17 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     end
 
     if isfield(coeffs, 'G_2npm') % Double Sum (2n+m)
-        mask = mask_2npm;
+        len_coeffs = length(coeffs.G_2npm);
+
+        if superOnly
+            mask = true(len_coeffs, 1);
+        else
+            if skip3Sub
+                mask = 1:2:len_coeffs; % keep pm=+1 only
+            else
+                mask = true(len_coeffs, 1);
+            end
+        end
         
         Z_2npm = (coeffs.A_2npm(mask) + 1i*coeffs.B_2npm(mask)) .* exp(-1i * coeffs.omega_2npm(mask) * t);
         
@@ -317,7 +274,41 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
     end
     
     if isfield(coeffs, 'G_npmpp') % Triple Sum (n+m+p)
-        mask = mask_npmpp;
+        N_c = coeffs.N;
+        % Triple sums
+        % Count: N*(N-1)*(N-2)/6 -> unique triplets {n,m,p}.
+        % Full: pmm=[1 -1], pmp=[1 -1]. 4 combinations per triplet.
+        % Super only: 1 combination.
+        
+        len_coeffs = length(coeffs.G_npmpp);
+        num_triplets = N_c*(N_c-1)*(N_c-2)/6;
+        
+        if superOnly
+            mask = true(len_coeffs, 1);
+        else
+            if skip3Sub
+                % Keep only pmm=+1, pmp=+1 branch (superharmonic +++).
+                idx = 0;
+                mask_log = false(len_coeffs, 1);
+                for n = 1:N_c
+                    for m = n+1:N_c
+                        for pmm = [1 -1]
+                            for p = m+1:N_c
+                                for pmp = [1 -1]
+                                    idx = idx + 1;
+                                    if pmm == 1 && pmp == 1
+                                        mask_log(idx) = true;
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                mask = mask_log;
+            else
+                mask = true(len_coeffs, 1);
+            end
+        end
         
         Z_npmpp = (coeffs.A_npmpp(mask) + 1i*coeffs.B_npmpp(mask)) .* exp(-1i * coeffs.omega_npmpp(mask) * t);
         
@@ -340,11 +331,11 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         fprintf('surfaceMF12_spectral: accumulation done in %.2fs\n', toc(t_accum));
     end
     t_grid = tic;
-    if eta_count > 0
-        spec_eta = accumarray([eta_idx_y(1:eta_count), eta_idx_x(1:eta_count)], eta_vals(1:eta_count), [Ny, Nx]);
+    if ~isempty(eta_vals)
+        spec_eta = accumarray([eta_idx_y, eta_idx_x], eta_vals, [Ny, Nx]);
     end
-    if phi_count > 0
-        spec_phi = accumarray([phi_idx_y(1:phi_count), phi_idx_x(1:phi_count)], phi_vals(1:phi_count), [Ny, Nx]);
+    if ~isempty(phi_vals)
+        spec_phi = accumarray([phi_idx_y, phi_idx_x], phi_vals, [Ny, Nx]);
     end
     if progress_enabled
         fprintf('surfaceMF12_spectral: accumarray done in %.2fs\n', toc(t_grid));
@@ -423,44 +414,14 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
         vals4 = vals4(nz);
 
         if strcmp(type, 'eta')
-            need = eta_count + numel(vals4);
-            if need > numel(eta_vals)
-                grow = max(numel(vals4), ceil(0.5*numel(eta_vals)));
-                eta_idx_x(end+1:end+grow,1) = 0;
-                eta_idx_y(end+1:end+grow,1) = 0;
-                eta_vals(end+1:end+grow,1) = 0;
-            end
-            rngw = (eta_count+1):need;
-            eta_idx_x(rngw) = idx_x;
-            eta_idx_y(rngw) = idx_y;
-            eta_vals(rngw) = vals4;
-            eta_count = need;
+            eta_idx_x = [eta_idx_x; idx_x];
+            eta_idx_y = [eta_idx_y; idx_y];
+            eta_vals = [eta_vals; vals4];
         else
-            need = phi_count + numel(vals4);
-            if need > numel(phi_vals)
-                grow = max(numel(vals4), ceil(0.5*numel(phi_vals)));
-                phi_idx_x(end+1:end+grow,1) = 0;
-                phi_idx_y(end+1:end+grow,1) = 0;
-                phi_vals(end+1:end+grow,1) = 0;
-            end
-            rngw = (phi_count+1):need;
-            phi_idx_x(rngw) = idx_x;
-            phi_idx_y(rngw) = idx_y;
-            phi_vals(rngw) = vals4;
-            phi_count = need;
+            phi_idx_x = [phi_idx_x; idx_x];
+            phi_idx_y = [phi_idx_y; idx_y];
+            phi_vals = [phi_vals; vals4];
         end
-    end
-
-    function nvals = estimate_total_values(c, m_np2m, m_2npm, m_npmpp)
-        nvals = 0;
-        if isfield(c, 'a'), nvals = nvals + numel(c.a); end               % linear
-        if isfield(c, 'G_2'), nvals = nvals + numel(c.G_2); end           % second self
-        if isfield(c, 'G_npm'), nvals = nvals + numel(c.G_npm); end       % second pair
-        if isfield(c, 'G_3'), nvals = nvals + numel(c.G_3); end           % third self
-        if ~isempty(m_np2m), nvals = nvals + nnz(m_np2m); end             % third np2m
-        if ~isempty(m_2npm), nvals = nvals + nnz(m_2npm); end             % third 2npm
-        if ~isempty(m_npmpp), nvals = nvals + nnz(m_npmpp); end           % third triple
-        % eta + phi are both deposited, prealloc uses 4*nvals for each field separately.
     end
 
     function [isWG, isNearRes] = detect_wavegroup_or_resonance(c)
