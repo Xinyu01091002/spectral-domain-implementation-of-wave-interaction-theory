@@ -355,6 +355,30 @@ if order >= 2
 end
 
 if order >= 3
+    omega_npm_corr = omega_npm;
+    pairCount = 0;
+    for n = 1:N
+        for m = (n+1):N
+            pairCount = pairCount + 1;
+            idxSum = 2*pairCount - 1;
+            idxDiff = idxSum + 1;
+            omega_npm_corr(idxSum) = omega(n) + omega(m);
+            omega_npm_corr(idxDiff) = omega(n) - omega(m);
+            omega_np2m(pairCount) = omega(n) + 2*omega(m);
+            omega_2npm(pairCount) = 2*omega(n) + omega(m);
+        end
+    end
+
+    c3corr = 0;
+    for n = 1:N
+        for m = (n+1):N
+            for p = (m+1):N
+                c3corr = c3corr + 1;
+                omega_npmpp(c3corr) = omega(n) + omega(m) + omega(p);
+            end
+        end
+    end
+
     coeffs.A_3 = A_3;
     coeffs.B_3 = B_3;
     coeffs.F_3 = F_3;
@@ -395,6 +419,13 @@ if order >= 3
     coeffs.kx_npmpp = kx_npmpp;
     coeffs.ky_npmpp = ky_npmpp;
     coeffs.gamma_2 = gamma_2;
+end
+
+if order >= 2
+    coeffs.omega_npm = omega_npm;
+end
+if order >= 3
+    coeffs.omega_npm = omega_npm_corr;
 end
 
 if dispCoeffs == 1

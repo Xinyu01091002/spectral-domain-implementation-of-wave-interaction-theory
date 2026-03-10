@@ -304,6 +304,33 @@ if order >= 2 % Second-order coefficients
     coeffs.M = M;
 end
 if order >= 3 % Third-order coefficients
+    omega_npm_corr = omega_npm;
+    cnm_corr = 0;
+    for n = 1:N
+        for m = n+1:N
+            for pm = [1 -1]
+                cnm_corr = cnm_corr + 1;
+                omega_npm_corr(cnm_corr) = omega(n) + pm*omega(m);
+                omega_np2m(cnm_corr) = omega(n) + pm*2*omega(m);
+                omega_2npm(cnm_corr) = 2*omega(n) + pm*omega(m);
+            end
+        end
+    end
+
+    c3corr = 0;
+    for n = 1:N
+        for m = n+1:N
+            for pmm = [1 -1]
+                for p = m+1:N
+                    for pmp = [1 -1]
+                        c3corr = c3corr + 1;
+                        omega_npmpp(c3corr) = omega(n) + pmm*omega(m) + pmp*omega(p);
+                    end
+                end
+            end
+        end
+    end
+
     coeffs.A_3 = A_3; coeffs.B_3 = B_3; coeffs.F_3 = F_3; coeffs.G_3 = G_3; 
     coeffs.mu_3 = mu_3; coeffs.kappa_3 = kappa_3;
     coeffs.F13 = F13;
@@ -319,6 +346,9 @@ if order >= 3 % Third-order coefficients
     coeffs.kx_np2m = kx_np2m; coeffs.ky_np2m = ky_np2m;
     coeffs.kx_2npm = kx_2npm; coeffs.ky_2npm = ky_2npm;
     coeffs.kx_npmpp = kx_npmpp; coeffs.ky_npmpp = ky_npmpp;
+end
+if order >= 3
+    coeffs.omega_npm = omega_npm_corr;
 end
 
 % Display higher-order output coefficients

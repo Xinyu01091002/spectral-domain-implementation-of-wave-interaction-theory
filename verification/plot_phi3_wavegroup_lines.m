@@ -10,10 +10,10 @@ g = 9.81;
 h = 150;
 Ux = 0;
 Uy = 0;
-Lx = 3000;
-Ly = 3000;
-Nx = 64;
-Ny = 64;
+Lx = 5000;
+Ly = 5000;
+Nx = 128;
+Ny = 128;
 t = 0.0;
 
 % Build a directional wave-group-like spectrum in k-space
@@ -37,13 +37,14 @@ theta_all = theta_all(keep);
 
 Tp = 12;
 kp = (2*pi/Tp)^2 / g;
+h = 1 / kp;              % set k_p d = 1
 lambda_p = 2*pi / kp;
 % Crossing-sea wave-group setup: two directional groups with different headings.
 theta1 = deg2rad(25);    % group-1 mean direction
 theta2 = deg2rad(-35);   % group-2 mean direction (crossing)
 sig_k = 0.10*kp;         % narrow-band => wave-group behavior
-sig_t1 = deg2rad(8);
-sig_t2 = deg2rad(10);
+sig_t1 = deg2rad(20);
+sig_t2 = deg2rad(24);
 w1 = 0.55;               % energy weights
 w2 = 0.45;
 
@@ -60,7 +61,7 @@ kx = kx_all(idx);
 ky = ky_all(idx);
 
 % Amplitudes and focusing phase at domain center
-A0 = 0.2;
+A0 = 0.35;
 amp = A0 * W(idx) / max(W(idx));
 xf = Lx/2;
 yf = Ly/2;
@@ -74,25 +75,45 @@ x = (0:Nx-1) * (Lx/Nx);
 y = (0:Ny-1) * (Ly/Ny);
 [X, Y] = meshgrid(x, y);
 
-% Order-wise decomposition coefficients.
-% first harmonic -> order 1 coefficients
-% second harmonics -> order 2 coefficients
-% third superharmonic -> order 3 coefficients
-c1 = coeffsMF12(1, g, h, a, b, kx, ky, Ux, Uy);
-c2 = coeffsMF12(2, g, h, a, b, kx, ky, Ux, Uy);
-c3 = coeffsMF12(3, g, h, a, b, kx, ky, Ux, Uy);
+% Keep the original benchmark pairing:
+%   direct   = coeffsMF12 + surfaceMF12_new
+%   spectral = coeffsMF12_superharmonic + surfaceMF12_spectral
+c1_d = coeffsMF12(1, g, h, a, b, kx, ky, Ux, Uy);
+c2_d = coeffsMF12(2, g, h, a, b, kx, ky, Ux, Uy);
+c3_d = coeffsMF12(3, g, h, a, b, kx, ky, Ux, Uy);
+c1_s = coeffsMF12_superharmonic(1, g, h, a, b, kx, ky, Ux, Uy);
+c2_s = coeffsMF12_superharmonic(2, g, h, a, b, kx, ky, Ux, Uy);
+c3_s = coeffsMF12_superharmonic(3, g, h, a, b, kx, ky, Ux, Uy);
+c3_s.third_order_subharmonic_mode = 'skip';
+c3_d_sup = select_third_order_superharmonic(c3_d);
+
+% Second-order super/sub separation by wavenumber filtering
+k2_super = [2*c2_d.kappa(:); c2_d.kappa_npm(1:2:end).'];
+k2_sub = c2_d.kappa_npm(2:2:end).';
+k2_super = k2_super(isfinite(k2_super) & k2_super > 0);
+k2_sub = k2_sub(isfinite(k2_sub) & k2_sub >= 0);
+if isempty(k2_super) || isempty(k2_sub)
+    error('Unable to build second-order spectral cutoff from MF12 coefficients.');
+end
+k2_cut = 0.5 * (max(k2_sub) + min(k2_super));
 
 % Decomposed components (Direct)
-phi1_d = phi_component_direct('first', c1, X, Y, t);
-phi2sup_d = phi_component_direct('second_super', c2, X, Y, t);
-phi2sub_d = phi_component_direct('second_sub', c2, X, Y, t);
-phi3_d = phi_component_direct('third_term', c3, X, Y, t);
+phi1_d = phi_surface_direct(1, c1_d, X, Y, t);
+phi2_d_total = phi_surface_direct(2, c2_d, X, Y, t);
+phi2_d_inc = phi2_d_total - phi1_d;
+phi2sup_d = split_by_wavenumber(phi2_d_inc, Lx, Ly, k2_cut, 'high');
+phi2sub_d = split_by_wavenumber(phi2_d_inc, Lx, Ly, k2_cut, 'low');
+phi3_d_total = phi_surface_direct(3, c3_d_sup, X, Y, t);
+phi3_d = phi3_d_total - phi2_d_total;
 
 % Decomposed components (Spectral)
-phi1_s = phi_component_spectral('first', c1, Lx, Ly, Nx, Ny, t);
-phi2sup_s = phi_component_spectral('second_super', c2, Lx, Ly, Nx, Ny, t);
-phi2sub_s = phi_component_spectral('second_sub', c2, Lx, Ly, Nx, Ny, t);
-phi3_s = phi_component_spectral('third_term', c3, Lx, Ly, Nx, Ny, t);
+phi1_s = phi_surface_spectral(c1_s, Lx, Ly, Nx, Ny, t);
+phi2_s_total = phi_surface_spectral(c2_s, Lx, Ly, Nx, Ny, t);
+phi2_s_inc = phi2_s_total - phi1_s;
+phi2sup_s = split_by_wavenumber(phi2_s_inc, Lx, Ly, k2_cut, 'high');
+phi2sub_s = split_by_wavenumber(phi2_s_inc, Lx, Ly, k2_cut, 'low');
+phi3_s_total = phi_surface_spectral(c3_s, Lx, Ly, Nx, Ny, t);
+phi3_s = phi3_s_total - phi2_s_total;
 
 % Centerline/diagonal extraction
 [~, iyc] = min(abs(y - Ly/2));
@@ -117,7 +138,6 @@ diag_s = {
     interp2(X, Y, phi2sub_s, s, s, 'linear'), ...
     interp2(X, Y, phi3_s, s, s, 'linear')
 };
-
 labels = {'first harmonic', 'second superharmonic', 'second subharmonic', 'third superharmonic'};
 
 % Plot window: around envelope focus, in units of a few dominant wavelengths.
@@ -195,7 +215,7 @@ for j = 1:4
     end
     set(ax, 'FontName', 'Times New Roman', 'FontSize', fs_tick, 'LineWidth', 0.8, 'Box', 'on');
     ax.GridAlpha = 0.20; ax.MinorGridAlpha = 0.10;
-    if j <= 4, ax.XTickLabel = []; end
+    ax.XTickLabel = [];
 end
 
 for j = 1:4
@@ -240,7 +260,7 @@ for j = 1:4
     end
     set(ax, 'FontName', 'Times New Roman', 'FontSize', fs_tick, 'LineWidth', 0.8, 'Box', 'on');
     ax.GridAlpha = 0.20; ax.MinorGridAlpha = 0.10;
-    if j <= 4, ax.XTickLabel = []; end
+    ax.XTickLabel = [];
     text(ax, 0.97, 0.90, sprintf('max=%.1e', max(abs(e))), 'Units', 'normalized', ...
         'HorizontalAlignment', 'right', 'FontName', 'Times New Roman', 'FontSize', fs_note, 'BackgroundColor', 'w');
 end
@@ -270,241 +290,83 @@ out_err = fullfile(outDir, 'mf12_phi3_wavegroup_lines_error_pub.png');
 exportgraphics(fig2, out_err, 'Resolution', 600);
 fprintf('Saved: %s\n', out_err);
 
-function phi = phi_component_direct(component, coeffs, X, Y, t)
-    phi = zeros(size(X));
-    N = coeffs.N;
+function phi = phi_surface_direct(order, coeffs, X, Y, t)
+    [~, phi] = surfaceMF12_new(order, coeffs, X, Y, t);
+end
 
-    switch component
-        case 'first'
-            for n = 1:N
-                th = coeffs.omega(n)*t - coeffs.kx(n)*X - coeffs.ky(n)*Y;
-                phi = phi + (coeffs.mu(n)+coeffs.muStar(n)) * ...
-                    (coeffs.a(n)*sin(th) - coeffs.b(n)*cos(th));
-            end
+function phi = phi_surface_spectral(coeffs, Lx, Ly, Nx, Ny, t)
+    [~, phi] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t);
+end
 
-        case 'second_super'
-            % Self-self (superharmonic)
-            for n = 1:N
-                th = coeffs.omega(n)*t - coeffs.kx(n)*X - coeffs.ky(n)*Y;
-                phi = phi + coeffs.mu_2(n) * ...
-                    (coeffs.A_2(n)*sin(2*th) - coeffs.B_2(n)*cos(2*th));
-            end
-            % Pair sum pm=+1
-            cnm = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pm = [1 -1]
-                        cnm = cnm + 1;
-                        if pm ~= 1, continue; end
-                        thn = coeffs.omega(n)*t - coeffs.kx(n)*X - coeffs.ky(n)*Y;
-                        thm = coeffs.omega(m)*t - coeffs.kx(m)*X - coeffs.ky(m)*Y;
-                        th = thn + pm*thm;
-                        phi = phi + coeffs.mu_npm(cnm) * ...
-                            (coeffs.A_npm(cnm)*sin(th) - coeffs.B_npm(cnm)*cos(th));
-                    end
-                end
-            end
+function coeffs_out = select_third_order_superharmonic(coeffs_in)
+    coeffs_out = coeffs_in;
 
-        case 'second_sub'
-            % Pair difference pm=-1 only
-            cnm = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pm = [1 -1]
-                        cnm = cnm + 1;
-                        if pm ~= -1, continue; end
-                        thn = coeffs.omega(n)*t - coeffs.kx(n)*X - coeffs.ky(n)*Y;
-                        thm = coeffs.omega(m)*t - coeffs.kx(m)*X - coeffs.ky(m)*Y;
-                        th = thn + pm*thm;
-                        phi = phi + coeffs.mu_npm(cnm) * ...
-                            (coeffs.A_npm(cnm)*sin(th) - coeffs.B_npm(cnm)*cos(th));
-                    end
-                end
-            end
+    if isfield(coeffs_out, 'G_np2m')
+        mask_minus = false(size(coeffs_out.G_np2m));
+        mask_minus(2:2:end) = true;
+        coeffs_out = zero_fields(coeffs_out, mask_minus, ...
+            {'A_np2m','B_np2m','F_np2m','G_np2m','mu_np2m','kappa_np2m','omega_np2m','kx_np2m','ky_np2m'});
+    end
 
-        case 'third_term'
-            % Self 3rd harmonic
-            for n = 1:N
-                th = coeffs.omega(n)*t - coeffs.kx(n)*X - coeffs.ky(n)*Y;
-                phi = phi + coeffs.mu_3(n) * ...
-                    (coeffs.A_3(n)*sin(3*th) - coeffs.B_3(n)*cos(3*th));
-            end
-            % Double sums (pm=+1 only)
-            cnm = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pm = [1 -1]
-                        cnm = cnm + 1;
-                        if pm ~= 1, continue; end
-                        thn = coeffs.omega(n)*t - coeffs.kx(n)*X - coeffs.ky(n)*Y;
-                        thm = coeffs.omega(m)*t - coeffs.kx(m)*X - coeffs.ky(m)*Y;
-                        th1 = thn + pm*2*thm;
-                        th2 = 2*thn + pm*thm;
-                        phi = phi + coeffs.mu_np2m(cnm) * ...
-                            (coeffs.A_np2m(cnm)*sin(th1) - coeffs.B_np2m(cnm)*cos(th1));
-                        phi = phi + coeffs.mu_2npm(cnm) * ...
-                            (coeffs.A_2npm(cnm)*sin(th2) - coeffs.B_2npm(cnm)*cos(th2));
-                    end
-                end
-            end
-            % Triple sums (pmm=1,pmp=1 only, with factor 2)
-            c3 = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pmm = [1 -1]
-                        for p = m+1:N
-                            for pmp = [1 -1]
-                                c3 = c3 + 1;
-                                if ~(pmm == 1 && pmp == 1), continue; end
-                                thn = coeffs.omega(n)*t - coeffs.kx(n)*X - coeffs.ky(n)*Y;
-                                thm = coeffs.omega(m)*t - coeffs.kx(m)*X - coeffs.ky(m)*Y;
-                                thp = coeffs.omega(p)*t - coeffs.kx(p)*X - coeffs.ky(p)*Y;
-                                th = thn + pmm*thm + pmp*thp;
-                                phi = phi + 2*coeffs.mu_npmpp(c3) * ...
-                                    (coeffs.A_npmpp(c3)*sin(th) - coeffs.B_npmpp(c3)*cos(th));
+    if isfield(coeffs_out, 'G_2npm')
+        mask_minus = false(size(coeffs_out.G_2npm));
+        mask_minus(2:2:end) = true;
+        coeffs_out = zero_fields(coeffs_out, mask_minus, ...
+            {'A_2npm','B_2npm','F_2npm','G_2npm','mu_2npm','kappa_2npm','omega_2npm','kx_2npm','ky_2npm'});
+    end
+
+    if isfield(coeffs_out, 'G_npmpp') && isfield(coeffs_out, 'N')
+        mask_sub = true(size(coeffs_out.G_npmpp));
+        idx = 0;
+        for n = 1:coeffs_out.N
+            for m = n+1:coeffs_out.N
+                for pmm = [1 -1]
+                    for p = m+1:coeffs_out.N
+                        for pmp = [1 -1]
+                            idx = idx + 1;
+                            if pmm == 1 && pmp == 1
+                                mask_sub(idx) = false;
                             end
                         end
                     end
                 end
             end
-
-        otherwise
-            error('Unknown component: %s', component);
+        end
+        coeffs_out = zero_fields(coeffs_out, mask_sub, ...
+            {'A_npmpp','B_npmpp','F_npmpp','G_npmpp','mu_npmpp','kappa_npmpp','omega_npmpp','kx_npmpp','ky_npmpp'});
     end
 end
 
-function phi = phi_component_spectral(component, coeffs, Lx, Ly, Nx, Ny, t)
-    dkx = 2*pi/Lx;
-    dky = 2*pi/Ly;
-    spec_phi = complex(zeros(Ny, Nx));
-    N = coeffs.N;
-
-    switch component
-        case 'first'
-            Z = (coeffs.a(:) + 1i*coeffs.b(:)) .* exp(-1i * coeffs.omega(:) * t);
-            mu = coeffs.mu(:) + coeffs.muStar(:);
-            spec_phi = deposit(spec_phi, coeffs.kx(:), coeffs.ky(:), Z .* mu * (1i), dkx, dky, Nx, Ny);
-
-        case 'second_super'
-            Z2 = (coeffs.A_2(:) + 1i*coeffs.B_2(:)) .* exp(-1i * (2*coeffs.omega(:)) * t);
-            spec_phi = deposit(spec_phi, 2*coeffs.kx(:), 2*coeffs.ky(:), Z2 .* coeffs.mu_2(:) * (1i), dkx, dky, Nx, Ny);
-            cnm = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pm = [1 -1]
-                        cnm = cnm + 1;
-                        if pm ~= 1, continue; end
-                        kx_eff = coeffs.kx(n) + pm*coeffs.kx(m);
-                        ky_eff = coeffs.ky(n) + pm*coeffs.ky(m);
-                        om_eff = coeffs.omega(n) + pm*coeffs.omega(m); % includes dispersion correction
-                        Z = (coeffs.A_npm(cnm) + 1i*coeffs.B_npm(cnm)) * exp(-1i * om_eff * t);
-                        spec_phi = deposit(spec_phi, kx_eff, ky_eff, Z * coeffs.mu_npm(cnm) * (1i), dkx, dky, Nx, Ny);
-                    end
-                end
-            end
-
-        case 'second_sub'
-            cnm = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pm = [1 -1]
-                        cnm = cnm + 1;
-                        if pm ~= -1, continue; end
-                        kx_eff = coeffs.kx(n) + pm*coeffs.kx(m);
-                        ky_eff = coeffs.ky(n) + pm*coeffs.ky(m);
-                        om_eff = coeffs.omega(n) + pm*coeffs.omega(m); % includes dispersion correction
-                        Z = (coeffs.A_npm(cnm) + 1i*coeffs.B_npm(cnm)) * exp(-1i * om_eff * t);
-                        spec_phi = deposit(spec_phi, kx_eff, ky_eff, Z * coeffs.mu_npm(cnm) * (1i), dkx, dky, Nx, Ny);
-                    end
-                end
-            end
-
-        case 'third_term'
-            Z3 = (coeffs.A_3(:) + 1i*coeffs.B_3(:)) .* exp(-1i * (3*coeffs.omega(:)) * t);
-            spec_phi = deposit(spec_phi, 3*coeffs.kx(:), 3*coeffs.ky(:), Z3 .* coeffs.mu_3(:) * (1i), dkx, dky, Nx, Ny);
-            % Double sums: keep superharmonic pm=+1 terms only, with corrected omega combinations.
-            cnm = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pm = [1 -1]
-                        cnm = cnm + 1;
-                        if pm ~= 1, continue; end
-
-                        om_np2m = coeffs.omega(n) + 2*coeffs.omega(m);
-                        kx_np2m = coeffs.kx(n) + 2*coeffs.kx(m);
-                        ky_np2m = coeffs.ky(n) + 2*coeffs.ky(m);
-                        Znp2m = (coeffs.A_np2m(cnm) + 1i*coeffs.B_np2m(cnm)) * exp(-1i * om_np2m * t);
-                        spec_phi = deposit(spec_phi, kx_np2m, ky_np2m, Znp2m * coeffs.mu_np2m(cnm) * (1i), dkx, dky, Nx, Ny);
-
-                        om_2npm = 2*coeffs.omega(n) + coeffs.omega(m);
-                        kx_2npm = 2*coeffs.kx(n) + coeffs.kx(m);
-                        ky_2npm = 2*coeffs.ky(n) + coeffs.ky(m);
-                        Z2npm = (coeffs.A_2npm(cnm) + 1i*coeffs.B_2npm(cnm)) * exp(-1i * om_2npm * t);
-                        spec_phi = deposit(spec_phi, kx_2npm, ky_2npm, Z2npm * coeffs.mu_2npm(cnm) * (1i), dkx, dky, Nx, Ny);
-                    end
-                end
-            end
-
-            % Triple sums: superharmonic pmm=+1, pmp=+1 only, with corrected omega combinations.
-            c3 = 0;
-            for n = 1:N
-                for m = n+1:N
-                    for pmm = [1 -1]
-                        for p = m+1:N
-                            for pmp = [1 -1]
-                                c3 = c3 + 1;
-                                if ~(pmm == 1 && pmp == 1), continue; end
-                                om = coeffs.omega(n) + coeffs.omega(m) + coeffs.omega(p);
-                                kx_eff = coeffs.kx(n) + coeffs.kx(m) + coeffs.kx(p);
-                                ky_eff = coeffs.ky(n) + coeffs.ky(m) + coeffs.ky(p);
-                                Z = 2*(coeffs.A_npmpp(c3) + 1i*coeffs.B_npmpp(c3)) * exp(-1i * om * t);
-                                spec_phi = deposit(spec_phi, kx_eff, ky_eff, Z * coeffs.mu_npmpp(c3) * (1i), dkx, dky, Nx, Ny);
-                            end
-                        end
-                    end
-                end
-            end
-
-        otherwise
-            error('Unknown component: %s', component);
+function coeffs_out = zero_fields(coeffs_in, mask, field_names)
+    coeffs_out = coeffs_in;
+    for k = 1:numel(field_names)
+        name = field_names{k};
+        if isfield(coeffs_out, name)
+            vals = coeffs_out.(name);
+            vals(mask) = 0;
+            coeffs_out.(name) = vals;
+        end
     end
-
-    phi = real(ifft2(spec_phi)) * (Nx * Ny);
 end
 
-function spec = deposit(spec, kx_in, ky_in, values, dkx, dky, Nx, Ny)
-    ux = (kx_in(:) / dkx);
-    uy = (ky_in(:) / dky);
-    vals = values(:);
+function phi_part = split_by_wavenumber(phi, Lx, Ly, k_cut, mode)
+    [Ny, Nx] = size(phi);
+    dkx = 2*pi / Lx;
+    dky = 2*pi / Ly;
+    kx_idx = [0:(Nx/2-1), -Nx/2:-1];
+    ky_idx = [0:(Ny/2-1), -Ny/2:-1];
+    [KX, KY] = meshgrid(kx_idx * dkx, ky_idx * dky);
+    K = hypot(KX, KY);
+    spec = fft2(phi);
 
-    valid = isfinite(ux) & isfinite(uy) & isfinite(vals);
-    ux = ux(valid); uy = uy(valid); vals = vals(valid);
-    if isempty(vals), return; end
+    switch mode
+        case 'high'
+            mask = K >= k_cut;
+        case 'low'
+            mask = K < k_cut;
+        otherwise
+            error('Unknown filter mode: %s', mode);
+    end
 
-    ix0 = floor(ux); iy0 = floor(uy);
-    fx = ux - ix0; fy = uy - iy0;
-    tol = 1e-12;
-    fx(abs(fx) < tol) = 0; fy(abs(fy) < tol) = 0;
-    fx(abs(fx-1) < tol) = 1; fy(abs(fy-1) < tol) = 1;
-
-    ix1 = ix0 + 1; iy1 = iy0 + 1;
-    idx_x00 = mod(ix0, Nx) + 1; idx_y00 = mod(iy0, Ny) + 1;
-    idx_x10 = mod(ix1, Nx) + 1; idx_y10 = idx_y00;
-    idx_x01 = idx_x00;          idx_y01 = mod(iy1, Ny) + 1;
-    idx_x11 = idx_x10;          idx_y11 = idx_y01;
-
-    w00 = (1-fx).*(1-fy);
-    w10 = fx.*(1-fy);
-    w01 = (1-fx).*fy;
-    w11 = fx.*fy;
-
-    idx_x = [idx_x00; idx_x10; idx_x01; idx_x11];
-    idx_y = [idx_y00; idx_y10; idx_y01; idx_y11];
-    vals4 = [vals.*w00; vals.*w10; vals.*w01; vals.*w11];
-    nz = abs(vals4) > 0;
-    idx_x = idx_x(nz); idx_y = idx_y(nz); vals4 = vals4(nz);
-    if isempty(vals4), return; end
-
-    addv = accumarray([idx_y, idx_x], vals4, [Ny, Nx]);
-    spec = spec + addv;
+    phi_part = real(ifft2(spec .* mask));
 end

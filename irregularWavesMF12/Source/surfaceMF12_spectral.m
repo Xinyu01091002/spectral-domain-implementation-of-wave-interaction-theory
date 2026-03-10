@@ -287,7 +287,6 @@ function [eta, phiS, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t)
 
     if isfield(coeffs, 'G_np2m') % Double Sum (n+2m)
         mask = mask_np2m;
-
         Z_np2m = (coeffs.A_np2m(mask) + 1i*coeffs.B_np2m(mask)) .* exp(-1i * coeffs.omega_np2m(mask) * t);
         
         % Ensure column vectors for Z and coefficients

@@ -56,11 +56,15 @@ c_direct = [0.06, 0.35, 0.67];
 c_spec = [0.86, 0.34, 0.12];
 c_direct_soft = [0.48, 0.66, 0.86];
 c_spec_soft = [0.96, 0.66, 0.48];
-lw_main = 2.2;
-lw_aux = 1.2;
-ms = 4.6;
+font_axis = 12.5;
+font_label = 14.5;
+font_legend = 11.5;
+font_panel = 14;
+lw_main = 2.8;
+lw_aux = 1.7;
+ms = 6.0;
 
-fig = figure('Color', 'w', 'Units', 'centimeters', 'Position', [1.5 1.5 19.2 8.8]);
+fig = figure('Color', 'w', 'Units', 'centimeters', 'Position', [1.5 1.5 24.0 10.8]);
 tl = tiledlayout(fig, 1, 2, 'Padding', 'compact', 'TileSpacing', 'tight');
 
 % -------------------- Left: theoretical --------------------
@@ -78,13 +82,13 @@ semilogy(ax1, Nc(marker_idx), Mtotal_direct(marker_idx), 'o', ...
     'Color', c_direct, 'MarkerFaceColor', c_direct, 'MarkerSize', ms, 'LineStyle', 'none');
 semilogy(ax1, Nc(marker_idx), Mtotal_spectral(marker_idx), 's', ...
     'Color', c_spec, 'MarkerFaceColor', c_spec, 'MarkerSize', ms, 'LineStyle', 'none');
-style_axes(ax1);
-xlabel(ax1, 'Number of retained components N_c', 'FontName', 'Times New Roman', 'FontSize', 10.5);
-ylabel(ax1, 'Computational complexity', 'FontName', 'Times New Roman', 'FontSize', 10.5);
+style_axes(ax1, font_axis);
+xlabel(ax1, 'Number of retained components N_c', 'FontName', 'Times New Roman', 'FontSize', font_label);
+ylabel(ax1, 'Computational complexity', 'FontName', 'Times New Roman', 'FontSize', font_label);
 hCoeff = plot(ax1, NaN, NaN, 'k--', 'LineWidth', lw_aux);
 hRecon = plot(ax1, NaN, NaN, 'k:', 'LineWidth', lw_aux);
 text(ax1, 0.03, 0.96, '(a)', 'Units', 'normalized', ...
-    'FontName', 'Times New Roman', 'FontSize', 11, 'FontWeight', 'bold', ...
+    'FontName', 'Times New Roman', 'FontSize', font_panel, 'FontWeight', 'bold', ...
     'VerticalAlignment', 'top');
 
 % -------------------- Right: actual --------------------
@@ -99,11 +103,11 @@ semilogy(ax2, actual.Nc, actual.direct_coeff_s, '--', 'Color', c_direct_soft, 'L
 semilogy(ax2, actual.Nc, actual.direct_recon_s, ':', 'Color', c_direct_soft, 'LineWidth', lw_aux);
 semilogy(ax2, actual.Nc, actual.spectral_coeff_s, '--', 'Color', c_spec_soft, 'LineWidth', lw_aux);
 semilogy(ax2, actual.Nc, actual.spectral_recon_s, ':', 'Color', c_spec_soft, 'LineWidth', lw_aux);
-style_axes(ax2);
-xlabel(ax2, 'Number of retained components N_c', 'FontName', 'Times New Roman', 'FontSize', 10.5);
-ylabel(ax2, 'Measured runtime (s)', 'FontName', 'Times New Roman', 'FontSize', 10.5);
+style_axes(ax2, font_axis);
+xlabel(ax2, 'Number of retained components N_c', 'FontName', 'Times New Roman', 'FontSize', font_label);
+ylabel(ax2, 'Measured runtime (s)', 'FontName', 'Times New Roman', 'FontSize', font_label);
 text(ax2, 0.03, 0.96, '(b)', 'Units', 'normalized', ...
-    'FontName', 'Times New Roman', 'FontSize', 11, 'FontWeight', 'bold', ...
+    'FontName', 'Times New Roman', 'FontSize', font_panel, 'FontWeight', 'bold', ...
     'VerticalAlignment', 'top');
 
 lgd = legend(ax1, [h1, h2, hCoeff, hRecon], ...
@@ -112,29 +116,38 @@ lgd = legend(ax1, [h1, h2, hCoeff, hRecon], ...
     'Orientation', 'vertical', 'NumColumns', 1, ...
     'Location', 'southeast', 'Box', 'on', ...
     'Color', 'w', 'EdgeColor', [0.82 0.82 0.82], ...
-    'FontName', 'Times New Roman', 'FontSize', 7.8);
+    'FontName', 'Times New Roman', 'FontSize', font_legend);
 
 out_png = fullfile(outDir, 'mf12_theory_vs_actual_time_scaling.png');
 out_mat = fullfile(outDir, 'mf12_theory_vs_actual_time_scaling.mat');
+out_csv = fullfile(outDir, 'mf12_theory_vs_actual_time_scaling_data.csv');
+
+csvData = outerjoin(plotData.theory, plotData.actual, ...
+    'Keys', 'Nc', ...
+    'MergeKeys', true, ...
+    'Type', 'full');
+csvData = sortrows(csvData, 'Nc');
 
 save(out_mat, 'plotData');
+writetable(csvData, out_csv);
 exportgraphics(fig, out_png, 'Resolution', 600);
 
 fprintf('Saved figure: %s\n', out_png);
 fprintf('Saved data  : %s\n', out_mat);
+fprintf('Saved csv   : %s\n', out_csv);
 fprintf('Trend check: theory and measurement should be qualitatively similar, not identical.\n');
 fprintf('Reason: asymptotics capture growth rate, while real timings also include constants, MATLAB overhead, memory traffic, and implementation details.\n');
 
-function style_axes(ax)
+function style_axes(ax, font_axis)
 grid(ax, 'on');
 set(ax, ...
     'FontName', 'Times New Roman', ...
-    'FontSize', 9.5, ...
-    'LineWidth', 0.8, ...
+    'FontSize', font_axis, ...
+    'LineWidth', 1.0, ...
     'Box', 'on', ...
     'Layer', 'top', ...
-    'GridColor', [0.86 0.86 0.86], ...
-    'GridAlpha', 0.28, ...
+    'GridColor', [0.82 0.82 0.82], ...
+    'GridAlpha', 0.36, ...
     'TickDir', 'out', ...
     'YScale', 'log');
 ax.XMinorGrid = 'off';

@@ -103,6 +103,10 @@ run('verification/test_new_spectral_realistic_sea_highN.m');
 - For directional wave-group-like cases, use:
   - `coeffs.third_order_subharmonic_mode = 'skip'`
   to avoid unstable third-order subharmonic branches in spectral reconstruction.
+- For time-dependent third-order superharmonic comparisons, the stored branch frequencies in
+  `coeffsMF12.m` and `coeffsMF12_superharmonic.m` are now synchronized with the corrected
+  single-wave frequencies `coeffs.omega`. This keeps spectral third-order phase evolution
+  consistent with the direct MF12 reconstruction when `t ~= 0`.
 - The benchmark log used by `verification/plot_mf12_theoretical_complexity_memory.m` is currently read from the root-level text file `outputfiles`.
 
 ## Harmonic Decomposition Figures
@@ -136,6 +140,14 @@ Both scripts use crossing-sea wave-group components and provide:
   - `irregularWavesMF12/Source/surfaceMF12.m`
 - The `mu_2npm` contribution now uses `sin(theta_2npm)` (consistent phase variable).
 - This removes the stable percent-level phase discrepancy previously observed in `phi` 3rd-order comparisons.
+- Fixed time-dependent third-order superharmonic phase drift between direct and spectral reconstruction by
+  updating the saved branch-frequency arrays (`omega_npm`, `omega_np2m`, `omega_2npm`, `omega_npmpp`)
+  in:
+  - `irregularWavesMF12/Source/coeffsMF12.m`
+  - `irregularWavesMF12/Source/coeffsMF12_superharmonic.m`
+- This aligns the spectral phase evolution with the corrected MF12 single-wave frequencies used by
+  `surfaceMF12_new`, and restores near-machine-precision agreement in `verification/plot_phi3_wavegroup_lines.m`
+  for nonzero time snapshots.
 
 ## Notes on Tracked vs Generated Files
 
