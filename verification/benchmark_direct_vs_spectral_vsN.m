@@ -1,7 +1,7 @@
 % BENCHMARK_DIRECT_VS_SPECTRAL_VSN
-% Compare reconstruction runtime vs N:
-%   Direct sum:    surfaceMF12_new
-%   Spectral (new): surfaceMF12_spectral
+% Compare end-to-end runtime vs N:
+%   Direct sum:      coeffsMF12 + surfaceMF12_new
+%   Spectral (new):  coeffsMF12_superharmonic + surfaceMF12_spectral
 
 clc;
 clear;
@@ -27,9 +27,10 @@ cfg.Ly = 3000;
 cfg.Nx = 64;
 cfg.Ny = 64;
 
-cfg.N_list = [40 60 80 100 150];
-cfg.repeats = 1;
+cfg.N_list = [40 60 80];
+cfg.repeats =1;
 cfg.seed = 20260306;
+cfg.plot_style_name = 'mf12_benchmark_v1';
 
 % Directional wave-group-like setup
 cfg.Tp = 12;
@@ -86,7 +87,7 @@ y = (0:cfg.Ny-1) * (cfg.Ly/cfg.Ny);
 rows = [];
 k = 0;
 
-fprintf('=== Direct vs Spectral runtime vs N ===\n');
+fprintf('=== Direct vs Spectral end-to-end runtime vs N ===\n');
 fprintf('Grid=%dx%d, order=%d, repeats=%d\n\n', cfg.Nx, cfg.Ny, cfg.order, cfg.repeats);
 
 for N = cfg.N_list
@@ -107,29 +108,34 @@ for N = cfg.N_list
     a = amp .* cos(phase); a = a(:).';
     b = amp .* sin(phase); b = b(:).';
 
-    coeffs = coeffsMF12(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
-
-    % Warmup
-    surfaceMF12_new(cfg.order, coeffs, X, Y, cfg.t);
-    coeffs_w = coeffs;
-    coeffs_w.third_order_subharmonic_mode = 'skip';
-    surfaceMF12_spectral(coeffs_w, cfg.Lx, cfg.Ly, cfg.Nx, cfg.Ny, cfg.t);
-
-    t_direct = zeros(cfg.repeats, 1);
-    t_spectral = zeros(cfg.repeats, 1);
+    t_direct_coeff = zeros(cfg.repeats, 1);
+    t_direct_recon = zeros(cfg.repeats, 1);
+    t_direct_total = zeros(cfg.repeats, 1);
+    t_spectral_coeff = zeros(cfg.repeats, 1);
+    t_spectral_recon = zeros(cfg.repeats, 1);
+    t_spectral_total = zeros(cfg.repeats, 1);
     eta_ref = [];
     eta_spec = [];
 
     for r = 1:cfg.repeats
         tic;
-        [eta_d, ~] = surfaceMF12_new(cfg.order, coeffs, X, Y, cfg.t);
-        t_direct(r) = toc;
+        coeffs_d = coeffsMF12(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
+        t_direct_coeff(r) = toc;
 
-        coeffs_s = coeffs;
+        tic;
+        [eta_d, ~] = surfaceMF12_new(cfg.order, coeffs_d, X, Y, cfg.t);
+        t_direct_recon(r) = toc;
+        t_direct_total(r) = t_direct_coeff(r) + t_direct_recon(r);
+
+        tic;
+        coeffs_s = coeffsMF12_superharmonic(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy, struct('enable_subharmonic', false));
+        t_spectral_coeff(r) = toc;
         coeffs_s.third_order_subharmonic_mode = 'skip';
+
         tic;
         [eta_s, ~] = surfaceMF12_spectral(coeffs_s, cfg.Lx, cfg.Ly, cfg.Nx, cfg.Ny, cfg.t);
-        t_spectral(r) = toc;
+        t_spectral_recon(r) = toc;
+        t_spectral_total(r) = t_spectral_coeff(r) + t_spectral_recon(r);
 
         if r == 1
             eta_ref = eta_d;
@@ -139,13 +145,18 @@ for N = cfg.N_list
 
     k = k + 1;
     rows(k).N = N; %#ok<SAGROW>
-    rows(k).direct_mean_s = mean(t_direct);
-    rows(k).spectral_mean_s = mean(t_spectral);
-    rows(k).speedup_direct_over_spectral = rows(k).direct_mean_s / max(rows(k).spectral_mean_s, eps);
+    rows(k).direct_coeff_mean_s = mean(t_direct_coeff);
+    rows(k).direct_recon_mean_s = mean(t_direct_recon);
+    rows(k).direct_total_mean_s = mean(t_direct_total);
+    rows(k).spectral_coeff_mean_s = mean(t_spectral_coeff);
+    rows(k).spectral_recon_mean_s = mean(t_spectral_recon);
+    rows(k).spectral_total_mean_s = mean(t_spectral_total);
+    rows(k).speedup_direct_over_spectral = rows(k).direct_total_mean_s / max(rows(k).spectral_total_mean_s, eps);
     rows(k).eta_max_abs_err = max(abs(eta_ref(:) - eta_spec(:)));
 
-    fprintf('N=%3d | direct %.3fs | spectral %.3fs | speedup %.2fx | max|deta| %.3e\n', ...
-        N, rows(k).direct_mean_s, rows(k).spectral_mean_s, ...
+    fprintf('N=%3d | direct total %.3fs (coeff %.3fs + recon %.3fs) | spectral total %.3fs (coeff %.3fs + recon %.3fs) | speedup %.2fx | max|deta| %.3e\n', ...
+        N, rows(k).direct_total_mean_s, rows(k).direct_coeff_mean_s, rows(k).direct_recon_mean_s, ...
+        rows(k).spectral_total_mean_s, rows(k).spectral_coeff_mean_s, rows(k).spectral_recon_mean_s, ...
         rows(k).speedup_direct_over_spectral, rows(k).eta_max_abs_err);
 end
 
@@ -154,30 +165,134 @@ disp(T);
 
 ts = datestr(now, 'yyyymmdd_HHMMSS');
 csv_name = fullfile(outDir, ['benchmark_direct_vs_spectral_vsN_' ts '.csv']);
+mat_name = fullfile(outDir, ['benchmark_direct_vs_spectral_vsN_' ts '.mat']);
 png_name = fullfile(outDir, ['benchmark_direct_vs_spectral_vsN_' ts '.png']);
 writetable(T, csv_name);
+plotData = build_plot_data(T, cfg, ts, csv_name, mat_name, png_name);
+save(mat_name, 'plotData');
 
-fig = figure('Color', 'w', 'Position', [100 100 980 420]);
-tiledlayout(1,2,'Padding','compact','TileSpacing','compact');
-
-nexttile;
-plot(T.N, T.direct_mean_s, 'o-', 'LineWidth', 1.8, 'MarkerSize', 7); hold on;
-plot(T.N, T.spectral_mean_s, 's-', 'LineWidth', 1.8, 'MarkerSize', 7); hold off;
-grid on;
-xlabel('N components');
-ylabel('Mean runtime (s)');
-title('Runtime vs N');
-set(gca, 'YScale', 'log');
-legend({'Direct sum', 'Spectral'}, 'Location', 'northwest');
-
-nexttile;
-plot(T.N, T.speedup_direct_over_spectral, 'd-', 'LineWidth', 1.8, 'MarkerSize', 7);
-grid on;
-xlabel('N components');
-ylabel('Speedup (direct / spectral)');
-title('Speedup vs N');
-
-exportgraphics(fig, png_name, 'Resolution', 160);
+fig = plot_benchmark_figure(plotData);
+exportgraphics(fig, png_name, 'Resolution', 180);
 
 fprintf('\nSaved: %s\n', csv_name);
+fprintf('Saved: %s\n', mat_name);
 fprintf('Saved: %s\n', png_name);
+
+function plotData = build_plot_data(T, cfg, ts, csv_name, mat_name, png_name)
+plotData = struct();
+plotData.timestamp = ts;
+plotData.cfg = cfg;
+plotData.table = T;
+plotData.files = struct('csv', csv_name, 'mat', mat_name, 'png', png_name);
+plotData.series = struct( ...
+    'N', T.N, ...
+    'direct_total', T.direct_total_mean_s, ...
+    'spectral_total', T.spectral_total_mean_s, ...
+    'direct_coeff', T.direct_coeff_mean_s, ...
+    'direct_recon', T.direct_recon_mean_s, ...
+    'spectral_coeff', T.spectral_coeff_mean_s, ...
+    'spectral_recon', T.spectral_recon_mean_s, ...
+    'speedup', T.speedup_direct_over_spectral, ...
+    'eta_err', T.eta_max_abs_err);
+end
+
+function fig = plot_benchmark_figure(plotData)
+T = plotData.table;
+style = benchmark_plot_style();
+
+fig = figure('Color', style.figure_color, 'Position', [80 80 1280 520]);
+tiledlayout(1, 3, 'Padding', 'compact', 'TileSpacing', 'compact');
+
+ax1 = nexttile;
+hold(ax1, 'on');
+plot(ax1, T.N, T.direct_total_mean_s, '-o', ...
+    'Color', style.direct_color, 'LineWidth', 2.2, ...
+    'MarkerSize', 7, 'MarkerFaceColor', style.direct_color);
+plot(ax1, T.N, T.spectral_total_mean_s, '-s', ...
+    'Color', style.spectral_color, 'LineWidth', 2.2, ...
+    'MarkerSize', 7, 'MarkerFaceColor', style.spectral_color);
+hold(ax1, 'off');
+format_axes(ax1, style);
+set(ax1, 'YScale', 'log');
+xlabel(ax1, 'N components');
+ylabel(ax1, 'Mean total runtime (s)');
+title(ax1, 'End-to-End Runtime');
+legend(ax1, {'Direct sum', 'Spectral'}, 'Location', 'northwest', 'Box', 'off');
+
+ax2 = nexttile;
+hold(ax2, 'on');
+plot(ax2, T.N, T.direct_coeff_mean_s, '--o', ...
+    'Color', style.direct_light, 'LineWidth', 1.8, ...
+    'MarkerSize', 6, 'MarkerFaceColor', style.direct_light);
+plot(ax2, T.N, T.direct_recon_mean_s, '-o', ...
+    'Color', style.direct_color, 'LineWidth', 2.0, ...
+    'MarkerSize', 6, 'MarkerFaceColor', style.direct_color);
+plot(ax2, T.N, T.spectral_coeff_mean_s, '--s', ...
+    'Color', style.spectral_light, 'LineWidth', 1.8, ...
+    'MarkerSize', 6, 'MarkerFaceColor', style.spectral_light);
+plot(ax2, T.N, T.spectral_recon_mean_s, '-s', ...
+    'Color', style.spectral_color, 'LineWidth', 2.0, ...
+    'MarkerSize', 6, 'MarkerFaceColor', style.spectral_color);
+hold(ax2, 'off');
+format_axes(ax2, style);
+set(ax2, 'YScale', 'log');
+xlabel(ax2, 'N components');
+ylabel(ax2, 'Mean runtime (s)');
+title(ax2, 'Coefficient vs Reconstruction');
+legend(ax2, {'Direct coeff', 'Direct recon', 'Spectral coeff', 'Spectral recon'}, ...
+    'Location', 'northwest', 'Box', 'off');
+
+ax3 = nexttile;
+yyaxis(ax3, 'left');
+plot(ax3, T.N, T.speedup_direct_over_spectral, '-d', ...
+    'Color', style.accent_color, 'LineWidth', 2.2, ...
+    'MarkerSize', 7, 'MarkerFaceColor', style.accent_color);
+ylabel(ax3, 'Speedup (direct / spectral)');
+
+yyaxis(ax3, 'right');
+plot(ax3, T.N, T.eta_max_abs_err, ':^', ...
+    'Color', style.error_color, 'LineWidth', 1.8, ...
+    'MarkerSize', 6, 'MarkerFaceColor', style.error_color);
+ylabel(ax3, 'Max |eta_{direct} - eta_{spectral}|');
+
+format_axes(ax3, style);
+set(ax3, 'YScale', 'log');
+xlabel(ax3, 'N components');
+title(ax3, 'Speedup and Consistency');
+legend(ax3, {'Speedup', 'Max |eta error|'}, 'Location', 'northwest', 'Box', 'off');
+
+sgtitle(fig, sprintf('MF12 Direct vs Spectral Benchmark  |  Grid %dx%d  |  t = %.2f s', ...
+    plotData.cfg.Nx, plotData.cfg.Ny, plotData.cfg.t), ...
+    'FontName', style.font_name, 'FontSize', 15, 'FontWeight', 'bold');
+end
+
+function style = benchmark_plot_style()
+style = struct();
+style.figure_color = [1.0 1.0 1.0];
+style.axes_color = [0.98 0.985 0.99];
+style.grid_color = [0.83 0.86 0.90];
+style.direct_color = [0.07 0.37 0.70];
+style.direct_light = [0.42 0.63 0.86];
+style.spectral_color = [0.82 0.33 0.18];
+style.spectral_light = [0.92 0.62 0.48];
+style.accent_color = [0.12 0.56 0.38];
+style.error_color = [0.58 0.22 0.67];
+style.font_name = 'Helvetica';
+end
+
+function format_axes(ax, style)
+set(ax, ...
+    'Color', style.axes_color, ...
+    'FontName', style.font_name, ...
+    'FontSize', 11, ...
+    'LineWidth', 0.9, ...
+    'Box', 'on', ...
+    'Layer', 'top', ...
+    'GridColor', style.grid_color, ...
+    'GridAlpha', 0.55, ...
+    'MinorGridColor', style.grid_color, ...
+    'MinorGridAlpha', 0.25);
+grid(ax, 'on');
+ax.XMinorGrid = 'off';
+ax.YMinorGrid = 'on';
+end

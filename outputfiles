@@ -1,0 +1,12 @@
+=== Direct vs Spectral end-to-end runtime vs N ===
+Grid=512x512, order=3, repeats=1
+
+N= 40 | direct total 48.001s (coeff 0.127s + recon 47.874s) | spectral total 0.035s (coeff 0.013s + recon 0.022s) | speedup 1365.99x | max|deta| 1.403e-13
+N= 60 | direct total 177.080s (coeff 0.413s + recon 176.667s) | spectral total 0.093s (coeff 0.041s + recon 0.053s) | speedup 1898.19x | max|deta| 2.558e-13
+N= 80 | direct total 417.699s (coeff 0.981s + recon 416.718s) | spectral total 0.179s (coeff 0.092s + recon 0.087s) | speedup 2335.63x | max|deta| 4.423e-13
+N=100 | direct total 811.848s (coeff 1.872s + recon 809.976s) | spectral total 0.316s (coeff 0.164s + recon 0.152s) | speedup 2570.79x | max|deta| 7.283e-13
+N=150 | direct total 2708.177s (coeff 6.401s + recon 2701.776s) | spectral total 1.200s (coeff 0.604s + recon 0.596s) | speedup 2257.57x | max|deta| 1.348e-12
+N=200 | direct total 4385.073s (coeff 16.200s + recon 4368.873s) | spectral total 3.159s (coeff 1.586s + recon 1.573s) | speedup 1388.25x | max|deta| 2.540e-12
+N=400 | direct total 34477.572s (coeff 128.957s + recon 34348.615s) | spectral total 19.583s (coeff 9.080s + recon 10.503s) | speedup 1760.62x | max|deta| 8.708e-12
+N=600 | direct total 115912.413s (coeff 414.915s + recon 115497.498s) | spectral total 69.207s (coeff 34.394s + recon 34.813s) | speedup 1674.86x | max|deta| 1.441e-11
+

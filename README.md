@@ -1,6 +1,6 @@
 ﻿# Spectral Domain Implementation for Crossing Sea Studies
 
-This repository contains MATLAB scripts for generating and comparing nonlinear wave surfaces in crossing-sea conditions, with a focus on MF12-based spectral methods and validation workflows.
+This repository contains MATLAB scripts for generating and comparing nonlinear wave fields in directional and crossing-sea conditions, with a focus on MF12-based third-order reconstruction, verification, and runtime scaling.
 
 ## Project Layout
 
@@ -14,7 +14,6 @@ This repository contains MATLAB scripts for generating and comparing nonlinear w
 |  |- benchmark_streaming_super_scalar_fastpath.m
 |  |- benchmark_mf12_speed_memory.m
 |  |- plot_mf12_theoretical_complexity_memory.m
-|  |- plot_mf12_theoretical_three_methods.m
 |  |- plot_phi3_direct_vs_spectral.m
 |  |- plot_phi3_wavegroup_lines.m
 |  |- plot_eta_wavegroup_lines.m
@@ -45,6 +44,9 @@ This repository contains MATLAB scripts for generating and comparing nonlinear w
 - The active production path is **in-memory MF12 coefficient precompute + spectral reconstruction**.
 - Out-of-core / chunked coefficient storage and disk-streaming reconstruction are removed from the active workflow.
 - `surfaceMF12_spectral` is the primary reconstruction path for performance comparisons.
+- The current paper-facing naming is:
+  - `Direct reconstruction` = direct physical-space reconstruction
+  - `Spectral reconstruction` = spectral accumulation with FFT-based reconstruction
 
 ## Quick Start
 
@@ -81,9 +83,8 @@ run('verification/benchmark_streaming_super_scalar_fastpath.m');
 % 5) Multi-method benchmark wrapper (kept for compatibility)
 run('verification/benchmark_mf12_speed_memory.m');
 
-% 6) Theory figures (no hardware timing dependence)
+% 6) Theory vs measured-runtime figure
 run('verification/plot_mf12_theoretical_complexity_memory.m');
-run('verification/plot_mf12_theoretical_three_methods.m');
 
 % 7) Third-order phi comparison figures
 run('verification/plot_phi3_direct_vs_spectral.m');
@@ -102,6 +103,7 @@ run('verification/test_new_spectral_realistic_sea_highN.m');
 - For directional wave-group-like cases, use:
   - `coeffs.third_order_subharmonic_mode = 'skip'`
   to avoid unstable third-order subharmonic branches in spectral reconstruction.
+- The benchmark log used by `verification/plot_mf12_theoretical_complexity_memory.m` is currently read from the root-level text file `outputfiles`.
 
 ## Harmonic Decomposition Figures
 
@@ -116,6 +118,16 @@ Both scripts use crossing-sea wave-group components and provide:
 - 2x4 layout (top: centerline, bottom: diagonal)
 - Columns: first harmonic, second superharmonic, second subharmonic, third superharmonic
 - x-axis normalized by `\lambda_p`
+
+## Theory vs Runtime Figure
+
+- `verification/plot_mf12_theoretical_complexity_memory.m` generates:
+  - `outputs/mf12_theory_vs_actual_time_scaling.png`
+  - `outputs/mf12_theory_vs_actual_time_scaling.mat`
+- The figure combines:
+  - theoretical complexity scaling for direct reconstruction and spectral reconstruction
+  - measured end-to-end runtime parsed from `outputfiles`
+- The output `.mat` stores both the theoretical curves and the parsed benchmark data for later replotting.
 
 ## Recent Fixes
 

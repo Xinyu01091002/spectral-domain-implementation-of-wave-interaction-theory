@@ -12,8 +12,8 @@ Ux = 0;
 Uy = 0;
 Lx = 3000;
 Ly = 3000;
-Nx = 513;
-Ny = 513;
+Nx = 64;
+Ny = 64;
 t = 0.0;
 
 % Build a directional wave-group-like spectrum in k-space

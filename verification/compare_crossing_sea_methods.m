@@ -21,8 +21,8 @@ h = 1500;
 Lx = 3000; 
 Ly = 3000; 
 % Reduced grid for feasible 3rd order full coefficient calculation
-Nx = 128;  
-Ny = 32;   
+Nx = 1024;  
+Ny = 64;   
 
 dx = Lx/Nx;
 dy = Ly/Ny;
@@ -86,11 +86,11 @@ Energy_raw = Amp_raw.^2;
 cum_E = cumsum(sorted_E);
 total_E = sum(Energy_raw);
 
-cutoff_ratio = 0.95; 
+cutoff_ratio = 0.999; 
 last_idx = find(cum_E >= cutoff_ratio * total_E, 1, 'first');
 
 % LIMIT COMPONENT COUNT to prevent O(N^3) explosion in memory/time for the naive method
-max_waves = 100; 
+max_waves = 85; 
 if last_idx > max_waves
     fprintf('  Warning: Limiting components from %d to %d for performance.\n', last_idx, max_waves);
     last_idx = max_waves;
