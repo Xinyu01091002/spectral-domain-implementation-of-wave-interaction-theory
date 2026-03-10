@@ -36,6 +36,7 @@ kmag_all = kmag_all(keep);
 theta_all = theta_all(keep);
 
 Tp = 12;
+t = 5 * Tp;
 kp = (2*pi/Tp)^2 / g;
 h = 1 / kp;              % set k_p d = 1
 lambda_p = 2*pi / kp;

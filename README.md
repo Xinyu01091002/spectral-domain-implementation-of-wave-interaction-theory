@@ -1,170 +1,142 @@
-﻿# Spectral Domain Implementation for Crossing Sea Studies
+# MF12 Spectral Reconstruction for Directional Wave Groups
 
-This repository contains MATLAB scripts for generating and comparing nonlinear wave fields in directional and crossing-sea conditions, with a focus on MF12-based third-order reconstruction, verification, and runtime scaling.
+This repository contains MATLAB code for direct and spectral reconstruction of nonlinear multidirectional wave fields based on the third-order Madsen-Fuhrman 2012 (MF12) framework. The codebase is organized to support manuscript-facing verification and benchmark results, with a particular focus on directional wave-group and crossing-sea cases.
 
-## Project Layout
+The repository currently supports:
+
+- MF12 coefficient generation in physical form and superharmonic-filtered form
+- direct physical-space reconstruction
+- spectral reconstruction with FFT-based accumulation
+- representative verification figures for directional wave-group cases
+- lightweight reproducibility and smoke-test entry points
+
+## Scope
+
+This is a research code release intended to support manuscript reproducibility, not a polished general-purpose package. Scientific behavior is preserved from the working research code where possible, and manuscript-oriented scripts remain available under `verification/`.
+
+## Repository Layout
 
 ```text
 .
-|- verification/                         # Validation/benchmark/plot scripts
-|  |- compare_crossing_sea_methods.m
-|  |- benchmark_mf12_direct_vs_spectral.m
-|  |- benchmark_direct_vs_spectral_vsN.m
-|  |- benchmark_surface_spectral_before_after.m
-|  |- benchmark_streaming_super_scalar_fastpath.m
-|  |- benchmark_mf12_speed_memory.m
-|  |- plot_mf12_theoretical_complexity_memory.m
-|  |- plot_phi3_direct_vs_spectral.m
-|  |- plot_phi3_wavegroup_lines.m
-|  |- plot_eta_wavegroup_lines.m
-|  `- test_new_spectral_realistic_sea_highN.m
-|- outputs/                              # Generated CSV/MAT/PNG/log outputs
-|  |- figures/
-|  `- processed_eta33/
-|- generate_crossing_sea.m               # Crossing-sea case generation
-|- analytic2D.m / compute_kxky.m         # Utility functions
-|- my2nd_directional_generator.m         # Directional wave generator utility
-|- irregularWavesMF12/                   # MF12 library (source + examples)
+|- irregularWavesMF12/                   # Core MF12 source code and original examples
+|  |- Source/
+|  `- Examples/
+|- verification/                        # Manuscript-facing verification and benchmark scripts
+|- repro/                               # Minimal public reproducibility entry points
+|- tests/                               # Lightweight smoke tests
+|- outputs/                             # Generated outputs (ignored by git)
+|- generate_crossing_sea.m              # Utility script for crossing-sea generation
+|- analytic2D.m
+|- compute_kxky.m
+|- my2nd_directional_generator.m
+|- LICENSE
 `- README.md
 ```
 
-## Folder Convention
+## Recommended Public Repository Name
 
-- Put validation, benchmark, and plotting scripts in `verification/`.
-- Put generated outputs (`.csv/.mat/.png/.log`) in `outputs/`.
-- Scripts in `verification/` are written to resolve paths from script location, so they can be run directly without switching MATLAB working directory.
+Suggested repository name:
+
+`mf12-spectral-directional-wave-reconstruction`
+
+This is short enough for citation and explicit about:
+
+- the underlying theory family (`MF12`)
+- the main numerical method (`spectral`)
+- the target class of cases (`directional wave reconstruction`)
 
 ## Requirements
 
-- MATLAB (recommended R2021a or newer)
-- No additional toolbox is strictly required for the included scripts
-
-## Current Workflow Policy
-
-- The active production path is **in-memory MF12 coefficient precompute + spectral reconstruction**.
-- Out-of-core / chunked coefficient storage and disk-streaming reconstruction are removed from the active workflow.
-- `surfaceMF12_spectral` is the primary reconstruction path for performance comparisons.
-- The current paper-facing naming is:
-  - `Direct reconstruction` = direct physical-space reconstruction
-  - `Spectral reconstruction` = spectral accumulation with FFT-based reconstruction
+- MATLAB (recommended: R2021a or newer)
+- no mandatory toolboxes beyond standard MATLAB functionality used by the included scripts
 
 ## Quick Start
 
-From MATLAB in the repository root:
+From the repository root in MATLAB:
 
 ```matlab
 addpath(genpath(fullfile(pwd, 'irregularWavesMF12')));
 rehash toolboxcache;
-
-% Generate a crossing-sea state
-generate_crossing_sea;
-
-% Run main method comparison
-run('verification/compare_crossing_sea_methods.m');
 ```
 
-## Benchmark Commands
+### Minimal Manuscript Reproduction
 
-From repository root:
+Run one representative manuscript-facing verification case:
 
 ```matlab
-% 1) Direct MF12 summation vs spectral reconstruction
-run('verification/benchmark_mf12_direct_vs_spectral.m');
+run('repro/reproduce_manuscript_minimal.m');
+```
 
-% 2) Runtime vs N (direct vs current spectral)
-run('verification/benchmark_direct_vs_spectral_vsN.m');
+This currently reproduces the directional wave-group third-order surface-potential comparison figure generated by:
 
-% 3) Before/after benchmark for current spectral optimizations
-run('verification/benchmark_surface_spectral_before_after.m');
-
-% 4) Scalar-fastpath benchmark for streaming_super add_to_spec micro-optimization
-run('verification/benchmark_streaming_super_scalar_fastpath.m');
-
-% 5) Multi-method benchmark wrapper (kept for compatibility)
-run('verification/benchmark_mf12_speed_memory.m');
-
-% 6) Theory vs measured-runtime figure
-run('verification/plot_mf12_theoretical_complexity_memory.m');
-
-% 7) Third-order phi comparison figures
-run('verification/plot_phi3_direct_vs_spectral.m');
+```matlab
 run('verification/plot_phi3_wavegroup_lines.m');
-
-% 8) Matching eta decomposition figures
-run('verification/plot_eta_wavegroup_lines.m');
-
-% 9) High-N realistic directional wave-group test (spectral only)
-run('verification/test_new_spectral_realistic_sea_highN.m');
 ```
 
-## Performance Notes
+### Minimal Smoke Test
 
-- `surfaceMF12_spectral` now uses reduced overhead accumulation (preallocated append buffers and reused branch masks), which significantly improves runtime for large `N`.
-- For directional wave-group-like cases, use:
-  - `coeffs.third_order_subharmonic_mode = 'skip'`
-  to avoid unstable third-order subharmonic branches in spectral reconstruction.
-- For time-dependent third-order superharmonic comparisons, the stored branch frequencies in
-  `coeffsMF12.m` and `coeffsMF12_superharmonic.m` are now synchronized with the corrected
-  single-wave frequencies `coeffs.omega`. This keeps spectral third-order phase evolution
-  consistent with the direct MF12 reconstruction when `t ~= 0`.
-- The benchmark log used by `verification/plot_mf12_theoretical_complexity_memory.m` is currently read from the root-level text file `outputfiles`.
+Run a lightweight direct-vs-spectral consistency check:
 
-## Harmonic Decomposition Figures
-
-- `verification/plot_phi3_wavegroup_lines.m` now generates two fixed paper-ready PNG files in `outputs/`:
-  - `mf12_phi3_wavegroup_lines_comparison_pub.png`
-  - `mf12_phi3_wavegroup_lines_error_pub.png`
-- `verification/plot_eta_wavegroup_lines.m` generates in `outputs/`:
-  - `mf12_eta_wavegroup_lines_comparison_pub.png`
-  - `mf12_eta_wavegroup_lines_error_pub.png`
-
-Both scripts use crossing-sea wave-group components and provide:
-- 2x4 layout (top: centerline, bottom: diagonal)
-- Columns: first harmonic, second superharmonic, second subharmonic, third superharmonic
-- x-axis normalized by `\lambda_p`
-
-## Theory vs Runtime Figure
-
-- `verification/plot_mf12_theoretical_complexity_memory.m` generates:
-  - `outputs/mf12_theory_vs_actual_time_scaling.png`
-  - `outputs/mf12_theory_vs_actual_time_scaling.mat`
-- The figure combines:
-  - theoretical complexity scaling for direct reconstruction and spectral reconstruction
-  - measured end-to-end runtime parsed from `outputfiles`
-- The output `.mat` stores both the theoretical curves and the parsed benchmark data for later replotting.
-
-## Recent Fixes
-
-- Fixed third-order potential phase bug in:
-  - `irregularWavesMF12/Source/surfaceMF12_new.m`
-  - `irregularWavesMF12/Source/surfaceMF12.m`
-- The `mu_2npm` contribution now uses `sin(theta_2npm)` (consistent phase variable).
-- This removes the stable percent-level phase discrepancy previously observed in `phi` 3rd-order comparisons.
-- Fixed time-dependent third-order superharmonic phase drift between direct and spectral reconstruction by
-  updating the saved branch-frequency arrays (`omega_npm`, `omega_np2m`, `omega_2npm`, `omega_npmpp`)
-  in:
-  - `irregularWavesMF12/Source/coeffsMF12.m`
-  - `irregularWavesMF12/Source/coeffsMF12_superharmonic.m`
-- This aligns the spectral phase evolution with the corrected MF12 single-wave frequencies used by
-  `surfaceMF12_new`, and restores near-machine-precision agreement in `verification/plot_phi3_wavegroup_lines.m`
-  for nonzero time snapshots.
-
-## Notes on Tracked vs Generated Files
-
-- Source code (`*.m`) is tracked.
-- Logs and generated outputs are ignored via `.gitignore`, including:
-  - `outputs/compare_log.txt`
-  - `outputs/run_output.txt`
-  - `outputs/figures/`
-  - `outputs/processed_eta33/`
-  - generated PNG/CSV/MAT/log under `outputs/`
-
-If you want to keep selected figures in GitHub, move them to a dedicated folder (for example `docs/images/`) and remove that folder from `.gitignore`.
-
-## Suggested First Commit
-
-```bash
-git init
-git add .
-git commit -m "Initial commit: spectral-domain MATLAB project"
+```matlab
+run('tests/smoke_test_minimal.m');
 ```
+
+This is intended as a release-readiness check, not a full validation suite.
+
+## Representative Verification and Benchmark Scripts
+
+The main manuscript-facing scripts remain in `verification/`:
+
+- `plot_phi3_wavegroup_lines.m`
+- `plot_eta_wavegroup_lines.m`
+- `plot_phi3_direct_vs_spectral.m`
+- `benchmark_mf12_direct_vs_spectral.m`
+- `benchmark_direct_vs_spectral_vsN.m`
+- `compare_crossing_sea_methods.m`
+
+These scripts compare direct reconstruction (`coeffsMF12 + surfaceMF12_new`) and spectral reconstruction (`coeffsMF12_superharmonic + surfaceMF12_spectral`) for directional and crossing-sea cases.
+
+## Reproducibility Notes
+
+- Generated figures, logs, and benchmark outputs are written under `outputs/` and are ignored by git.
+- The public reproducibility entry point is intentionally minimal. It reproduces one representative verification case rather than every manuscript figure.
+- The directional wave-group verification scripts include finite-depth, multidirectional, and time-dependent third-order tests, which are significantly more demanding than simple unidirectional checks.
+
+## Scientific Notes
+
+- `surfaceMF12_spectral` is the primary spectral reconstruction path used for performance-oriented comparisons.
+- Directional wave-group cases may require skipping third-order subharmonic branches in the spectral path:
+
+```matlab
+coeffs.third_order_subharmonic_mode = 'skip';
+```
+
+- The current code also synchronizes stored third-order branch frequencies with the corrected MF12 single-wave frequencies when third-order coefficients are generated, which is important for nonzero-time third-order phase agreement.
+
+## License
+
+This repository currently uses the MIT License.
+
+Why MIT is a reasonable default here:
+
+- it is standard for public scientific code releases
+- it minimizes reuse friction for manuscript reviewers and downstream researchers
+- it is compatible with academic reuse, benchmarking, and derivative implementations
+
+If you need stronger attribution requirements or explicit patent language, Apache-2.0 would be the main alternative. For a manuscript-support repository, MIT is usually the simplest public-release choice.
+
+## Public Release Readiness: Remaining Blockers
+
+The repository is close to public-release ready, but a few limitations remain:
+
+- author metadata is still generic in `LICENSE`
+- manuscript citation metadata is not yet included (`CITATION.cff` is absent)
+- there is not yet a pinned environment statement beyond MATLAB version guidance
+- verification scripts are still manuscript-oriented rather than packaged as stable APIs
+- some top-level utility files are still named from research workflow context rather than public package context
+
+None of these block code availability, but they are the main items left before a polished public release.
+
+## Suggested Citation Practice
+
+Until a formal software citation file is added, cite the manuscript and reference the repository URL and commit hash used for reproduction.
