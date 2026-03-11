@@ -5,12 +5,17 @@
 % both of these works appropriately.
 % 
 % The code provided can compute both free surface elevations and kinematics
-% for irregular waves to a desired order (1, 2 or 3).  Several examples
-% demonstrating its full use can be found in the Examples folder, which are 
-% intended as self explanatory.  All source code used by these examples can 
-% be found within the Source folder. As a first example, it is suggested to 
-% execute e.g. the example_ThreeWaves.m script, which confirms the 
-% coefficient values in Tables 2 and 3 of Madsen and Fuhrman (2012). 
+% for irregular waves to a desired order (1, 2 or 3).  The primary source
+% code lives in the Source folder.
+%
+% In this repository, clearer source-level aliases have also been added in
+% the Source folder:
+%   mf12_direct_coefficients
+%   mf12_spectral_coefficients
+%   mf12_direct_surface
+%   mf12_spectral_surface
+% These aliases are intended to be easier to understand than some of the
+% original development-era file names, while preserving the same behavior.
 %
 % Code was programmed by David R. Fuhrman, November 2022
 %

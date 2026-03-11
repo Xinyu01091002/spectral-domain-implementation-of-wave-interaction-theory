@@ -1,11 +1,12 @@
-function [coeffs] = coeffsMF12_superharmonic(order,g,h,a,b,kx,ky,Ux,Uy,varargin)
-%COEFFSMF12_SUPERHARMONIC MF12 coefficients with selective interaction retention.
+function [coeffs] = mf12_spectral_coefficients(order,g,h,a,b,kx,ky,Ux,Uy,varargin)
+%MF12_SPECTRAL_COEFFICIENTS MF12 coefficients with selective interaction retention.
+% This is the preferred spectral-coefficient implementation name in this repository.
 %   Keeps:
 %   - Second-order self, sum, and difference interactions.
 %   - Third-order first-order corrections (dispersion and potential corrections).
 %   - Third-order superharmonics only: (n+2m), (2n+m), and (n+m+p).
 %
-%   Inputs match coeffsMF12.
+%   Inputs match mf12_direct_coefficients.
 %
 %   Optional trailing inputs:
 %     dispCoeffs (scalar, default 0)
@@ -31,7 +32,7 @@ end
 if ~isfield(opts, 'enable_subharmonic'), opts.enable_subharmonic = false; end
 if opts.enable_subharmonic
     % Isolated full-subharmonic path. No subharmonic memory/compute in default mode.
-    coeffs = coeffsMF12(order,g,h,a,b,kx,ky,Ux,Uy,dispCoeffs);
+    coeffs = mf12_direct_coefficients(order,g,h,a,b,kx,ky,Ux,Uy,dispCoeffs);
     coeffs.superharmonic_only = false;
     coeffs.enable_subharmonic = true;
     coeffs.opts = opts;
@@ -66,7 +67,7 @@ if order >= 2
     B_2 = (a.*b)/h;                                                                % Eq. 3.11
     mu_2 = F_2.*cosh(h*kappa_2) - h*omega1;                                       % Eq. 3.79
 
-    % Mass flux coefficient (kept for compatibility with full coeffsMF12 outputs)
+    % Mass flux coefficient retained for consistency with the direct coefficient structure.
     M = c.^2.*omega1./(2*kappa).*coth(h*kappa);                                   % Eq. 3.70 factor
 
     % Second-order pair interactions: keep both n+m and n-m
@@ -158,7 +159,7 @@ if order == 3
         mu_3(n) = F_3(n)*cosh(h*kappa_3(n)) - g*h^2*kappa(n)^2/(4*omega1(n)) + 0.5*h*(F_2(n)*gamma_2(n) - omega1(n)*G_2(n)); % Eq. 3.80
     end
 
-    % Two pair-index maps are needed to mirror coeffsMF12 indexing:
+    % Two pair-index maps are needed to mirror the retained direct-index layout:
     % 1) Row-wise odd map: matches cnm index for pmm=+1 in triple loops.
     M_nm_row_odd = zeros(N);
     pairCount = 0;
@@ -168,7 +169,7 @@ if order == 3
             M_nm_row_odd(n,m) = 2*pairCount - 1;
         end
     end
-    % 2) Column-major odd map: matches M_nm constructed in coeffsMF12.
+    % 2) Column-major odd map: matches the historical M_nm construction.
     M_nm_col_odd = zeros(N);
     nm_indices = 1:(N*(N-1)/2);
     M_nm_col_odd(triu(ones(N),1)==1) = nm_indices;

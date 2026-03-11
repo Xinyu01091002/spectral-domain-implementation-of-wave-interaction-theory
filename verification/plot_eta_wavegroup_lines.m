@@ -1,7 +1,7 @@
 clc; clear; close all;
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 outDir = fullfile(rootDir, 'outputs');
 if ~exist(outDir, 'dir'), mkdir(outDir); end
 
@@ -72,9 +72,9 @@ y = (0:Ny-1) * (Ly/Ny);
 [X, Y] = meshgrid(x, y);
 
 % Order-wise decomposition coefficients
-c1 = coeffsMF12(1, g, h, a, b, kx, ky, Ux, Uy);
-c2 = coeffsMF12(2, g, h, a, b, kx, ky, Ux, Uy);
-c3 = coeffsMF12(3, g, h, a, b, kx, ky, Ux, Uy);
+c1 = mf12_direct_coefficients(1, g, h, a, b, kx, ky, Ux, Uy);
+c2 = mf12_direct_coefficients(2, g, h, a, b, kx, ky, Ux, Uy);
+c3 = mf12_direct_coefficients(3, g, h, a, b, kx, ky, Ux, Uy);
 
 % Decomposed eta components (Direct)
 eta1_d = eta_component_direct('first', c1, X, Y, t);

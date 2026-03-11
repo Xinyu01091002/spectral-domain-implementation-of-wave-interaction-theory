@@ -1,7 +1,7 @@
 clc; clear; close all;
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 outDir = fullfile(rootDir, 'outputs');
 if ~exist(outDir, 'dir'), mkdir(outDir); end
 
@@ -14,7 +14,7 @@ Lx = 5000;
 Ly = 5000;
 Nx = 128;
 Ny = 128;
-t = 0.0;
+t_eval = 0.0;
 
 % Build a directional wave-group-like spectrum in k-space
 rng(1234);
@@ -35,39 +35,60 @@ ky_all = ky_all(keep);
 kmag_all = kmag_all(keep);
 theta_all = theta_all(keep);
 
-Tp = 12;
-t = 5 * Tp;
-kp = (2*pi/Tp)^2 / g;
-h = 1 / kp;              % set k_p d = 1
+kp = 0.0279;
+h = 1 / kp;
 lambda_p = 2*pi / kp;
-% Crossing-sea wave-group setup: two directional groups with different headings.
-theta1 = deg2rad(25);    % group-1 mean direction
-theta2 = deg2rad(-35);   % group-2 mean direction (crossing)
-sig_k = 0.10*kp;         % narrow-band => wave-group behavior
-sig_t1 = deg2rad(20);
-sig_t2 = deg2rad(24);
-w1 = 0.55;               % energy weights
-w2 = 0.45;
+omega_p = sqrt(g*kp*tanh(h*kp));
+Tp = 2*pi / omega_p;
+t_focus = 0.0; % By construction, both wave groups overlap at the domain center when t_eval = 0.
 
-Sk = exp(-0.5*((kmag_all - kp)/sig_k).^2);
-St1 = exp(-0.5*(angle(exp(1i*(theta_all - theta1)))/sig_t1).^2);
-St2 = exp(-0.5*(angle(exp(1i*(theta_all - theta2)))/sig_t2).^2);
-W = Sk .* (w1*St1 + w2*St2);
+Akp = 0.02;
+kw_left = 0.004606;
+kw_right = kw_left;
+A_focus_total = Akp / kp;
 
-% Keep energetic modes
-[~, idx_sort] = sort(W, 'descend');
-N = 60;
+kw_vec = kw_right * ones(size(kmag_all));
+kw_vec(kmag_all <= kp) = kw_left;
+Sk = exp(-((kmag_all - kp).^2) ./ (2 * kw_vec.^2));
+
+group1_heading_deg = 0;
+group1_spread_deg = 18;
+group1_weight = 0.55;
+
+group2_heading_deg = -35;
+group2_spread_deg = 18;
+group2_weight = 0.45;
+
+D1 = gaussian_spreading(theta_all - deg2rad(group1_heading_deg), group1_spread_deg);
+D2 = gaussian_spreading(theta_all - deg2rad(group2_heading_deg), group2_spread_deg);
+W = Sk .* (group1_weight * D1 + group2_weight * D2);
+
+crossing_angle_deg = abs(angle(exp(1i * deg2rad(group1_heading_deg - group2_heading_deg)))) * 180 / pi;
+fprintf('Line script: crossing angle = %.2f deg.\n', crossing_angle_deg);
+
+energy_keep_frac = 0.9999;
+max_components = 120; % Safety cap for the direct third-order path.
+[W_sorted, idx_sort] = sort(W, 'descend');
+cum_energy = cumsum(W_sorted);
+N_energy = find(cum_energy >= energy_keep_frac * cum_energy(end), 1, 'first');
+N = min(N_energy, max_components);
 idx = idx_sort(1:N);
 kx = kx_all(idx);
 ky = ky_all(idx);
+fprintf('Line script: retained %d components for %.4f%% cumulative energy', N, 100 * energy_keep_frac);
+if N < N_energy
+    fprintf(' (capped from %d for direct third-order cost)', N_energy);
+end
+fprintf('.\n');
 
 % Amplitudes and focusing phase at domain center
-A0 = 0.35;
-amp = A0 * W(idx) / max(W(idx));
+Wsel = W(idx);
+amp = Wsel;
+amp = amp * (A_focus_total / max(sum(amp), eps));
 xf = Lx/2;
 yf = Ly/2;
 omega_lin = sqrt(g*hypot(kx,ky).*tanh(h*hypot(kx,ky)));
-phase = -(kx*xf + ky*yf) + omega_lin*t;
+phase = -(kx*xf + ky*yf) + omega_lin*t_focus;
 a = amp .* cos(phase);
 b = amp .* sin(phase);
 
@@ -77,14 +98,14 @@ y = (0:Ny-1) * (Ly/Ny);
 [X, Y] = meshgrid(x, y);
 
 % Keep the original benchmark pairing:
-%   direct   = coeffsMF12 + surfaceMF12_new
-%   spectral = coeffsMF12_superharmonic + surfaceMF12_spectral
-c1_d = coeffsMF12(1, g, h, a, b, kx, ky, Ux, Uy);
-c2_d = coeffsMF12(2, g, h, a, b, kx, ky, Ux, Uy);
-c3_d = coeffsMF12(3, g, h, a, b, kx, ky, Ux, Uy);
-c1_s = coeffsMF12_superharmonic(1, g, h, a, b, kx, ky, Ux, Uy);
-c2_s = coeffsMF12_superharmonic(2, g, h, a, b, kx, ky, Ux, Uy);
-c3_s = coeffsMF12_superharmonic(3, g, h, a, b, kx, ky, Ux, Uy);
+%   direct   = mf12_direct_coefficients + mf12_direct_surface
+%   spectral = mf12_spectral_coefficients + mf12_spectral_surface
+c1_d = mf12_direct_coefficients(1, g, h, a, b, kx, ky, Ux, Uy);
+c2_d = mf12_direct_coefficients(2, g, h, a, b, kx, ky, Ux, Uy);
+c3_d = mf12_direct_coefficients(3, g, h, a, b, kx, ky, Ux, Uy);
+c1_s = mf12_spectral_coefficients(1, g, h, a, b, kx, ky, Ux, Uy);
+c2_s = mf12_spectral_coefficients(2, g, h, a, b, kx, ky, Ux, Uy);
+c3_s = mf12_spectral_coefficients(3, g, h, a, b, kx, ky, Ux, Uy);
 c3_s.third_order_subharmonic_mode = 'skip';
 c3_d_sup = select_third_order_superharmonic(c3_d);
 
@@ -99,21 +120,21 @@ end
 k2_cut = 0.5 * (max(k2_sub) + min(k2_super));
 
 % Decomposed components (Direct)
-phi1_d = phi_surface_direct(1, c1_d, X, Y, t);
-phi2_d_total = phi_surface_direct(2, c2_d, X, Y, t);
+phi1_d = phi_surface_direct(1, c1_d, X, Y, t_eval);
+phi2_d_total = phi_surface_direct(2, c2_d, X, Y, t_eval);
 phi2_d_inc = phi2_d_total - phi1_d;
 phi2sup_d = split_by_wavenumber(phi2_d_inc, Lx, Ly, k2_cut, 'high');
 phi2sub_d = split_by_wavenumber(phi2_d_inc, Lx, Ly, k2_cut, 'low');
-phi3_d_total = phi_surface_direct(3, c3_d_sup, X, Y, t);
+phi3_d_total = phi_surface_direct(3, c3_d_sup, X, Y, t_eval);
 phi3_d = phi3_d_total - phi2_d_total;
 
 % Decomposed components (Spectral)
-phi1_s = phi_surface_spectral(c1_s, Lx, Ly, Nx, Ny, t);
-phi2_s_total = phi_surface_spectral(c2_s, Lx, Ly, Nx, Ny, t);
+phi1_s = phi_surface_spectral(c1_s, Lx, Ly, Nx, Ny, t_eval);
+phi2_s_total = phi_surface_spectral(c2_s, Lx, Ly, Nx, Ny, t_eval);
 phi2_s_inc = phi2_s_total - phi1_s;
 phi2sup_s = split_by_wavenumber(phi2_s_inc, Lx, Ly, k2_cut, 'high');
 phi2sub_s = split_by_wavenumber(phi2_s_inc, Lx, Ly, k2_cut, 'low');
-phi3_s_total = phi_surface_spectral(c3_s, Lx, Ly, Nx, Ny, t);
+phi3_s_total = phi_surface_spectral(c3_s, Lx, Ly, Nx, Ny, t_eval);
 phi3_s = phi3_s_total - phi2_s_total;
 
 % Centerline/diagonal extraction
@@ -292,11 +313,11 @@ exportgraphics(fig2, out_err, 'Resolution', 600);
 fprintf('Saved: %s\n', out_err);
 
 function phi = phi_surface_direct(order, coeffs, X, Y, t)
-    [~, phi] = surfaceMF12_new(order, coeffs, X, Y, t);
+    [~, phi] = mf12_direct_surface(order, coeffs, X, Y, t);
 end
 
 function phi = phi_surface_spectral(coeffs, Lx, Ly, Nx, Ny, t)
-    [~, phi] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, t);
+    [~, phi] = mf12_spectral_surface(coeffs, Lx, Ly, Nx, Ny, t);
 end
 
 function coeffs_out = select_third_order_superharmonic(coeffs_in)
@@ -370,4 +391,10 @@ function phi_part = split_by_wavenumber(phi, Lx, Ly, k_cut, mode)
     end
 
     phi_part = real(ifft2(spec .* mask));
+end
+
+function D = gaussian_spreading(theta, spread_angle_deg)
+    theta_wrapped = angle(exp(1i * theta));
+    sigma = deg2rad(spread_angle_deg);
+    D = exp(-0.5 * (theta_wrapped / max(sigma, eps)).^2);
 end

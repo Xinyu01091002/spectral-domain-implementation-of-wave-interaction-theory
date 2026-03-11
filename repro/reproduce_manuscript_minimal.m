@@ -2,7 +2,7 @@ clc; close all;
 
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 
 fprintf('=== Minimal Manuscript Reproduction ===\n');
 fprintf('Repository root: %s\n', rootDir);

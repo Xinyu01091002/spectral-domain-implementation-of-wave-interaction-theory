@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+title: "MF12 Spectral Reconstruction for Directional Wave Groups"
+message: "If you use this repository, please cite the software and the associated manuscript."
+type: software
+authors:
+  - family-names: "To Be Updated"
+    given-names: "Repository Authors"
+repository-code: "https://github.com/TO-BE-UPDATED/mf12-spectral-directional-wave-reconstruction"
+license: "MIT"
+abstract: "MATLAB implementations for direct and spectral reconstruction of nonlinear multidirectional wave fields based on the MF12 framework."
+keywords:
+  - MATLAB
+  - wave reconstruction
+  - MF12
+  - spectral method
+  - irregular waves

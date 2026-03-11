@@ -1,7 +1,7 @@
 clc; clear; close all;
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 outDir = fullfile(rootDir, 'outputs');
 if ~exist(outDir, 'dir'), mkdir(outDir); end
 
@@ -31,8 +31,8 @@ k = 0;
 
 fprintf('=== MF12 Speed/Memory Benchmark ===\n');
 fprintf('Pipelines:\n');
-fprintf('  Direct   = coeffsMF12 + surfaceMF12_new\n');
-fprintf('  Spectral = coeffsMF12_superharmonic + surfaceMF12_spectral\n');
+fprintf('  Direct   = mf12_direct_coefficients + mf12_direct_surface\n');
+fprintf('  Spectral = mf12_spectral_coefficients + mf12_spectral_surface\n');
 fprintf('  Streaming= surfaceMF12_integrated_opt(useStreaming=true)\n');
 fprintf('Order=%d, repeats=%d\n\n', cfg.order, cfg.repeats);
 
@@ -46,7 +46,6 @@ for c = 1:size(case_matrix, 1)
     dy = cfg.Ly / Ny;
     x = (0:Nx-1) * dx;
     y = (0:Ny-1) * dy;
-    [X, Y] = meshgrid(x, y);
 
     fprintf('Case %d: N=%d, grid=%dx%d\n', c, N, Nx, Ny);
 
@@ -63,10 +62,11 @@ for c = 1:size(case_matrix, 1)
     eta_stream_ref = [];
 
     % Warmup (once per case)
-    coeffs_d = coeffsMF12(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
-    [~, ~] = surfaceMF12_new(cfg.order, coeffs_d, X, Y, cfg.t);
-    coeffs_s = coeffsMF12_superharmonic(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
-    [~, ~] = surfaceMF12_spectral(coeffs_s, cfg.Lx, cfg.Ly, Nx, Ny, cfg.t);
+    coeffs_d = mf12_direct_coefficients(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
+    [X, Y] = meshgrid(x, y);
+    [~, ~] = mf12_direct_surface(cfg.order, coeffs_d, X, Y, cfg.t);
+    coeffs_s = mf12_spectral_coefficients(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
+    [~, ~] = mf12_spectral_surface(coeffs_s, cfg.Lx, cfg.Ly, Nx, Ny, cfg.t);
     opts = struct('useStreaming', true, 'legacyMode', false);
     [~, ~] = surfaceMF12_integrated_opt(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy, cfg.Lx, cfg.Ly, Nx, Ny, cfg.t, opts);
 
@@ -74,8 +74,9 @@ for c = 1:size(case_matrix, 1)
         % Direct (full)
         m0 = safe_memory_snapshot();
         tic;
-        coeffs_d = coeffsMF12(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
-        [eta_d, ~] = surfaceMF12_new(cfg.order, coeffs_d, X, Y, cfg.t);
+        coeffs_d = mf12_direct_coefficients(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
+        [X, Y] = meshgrid(x, y);
+        [eta_d, ~] = mf12_direct_surface(cfg.order, coeffs_d, X, Y, cfg.t);
         t_direct(r) = toc;
         m1 = safe_memory_snapshot();
         m_direct(r) = mem_delta_mb(m0, m1);
@@ -83,8 +84,8 @@ for c = 1:size(case_matrix, 1)
         % Spectral (superharmonic coeffs + spectral reconstruction)
         m0 = safe_memory_snapshot();
         tic;
-        coeffs_s = coeffsMF12_superharmonic(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
-        [eta_s, ~] = surfaceMF12_spectral(coeffs_s, cfg.Lx, cfg.Ly, Nx, Ny, cfg.t);
+        coeffs_s = mf12_spectral_coefficients(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
+        [eta_s, ~] = mf12_spectral_surface(coeffs_s, cfg.Lx, cfg.Ly, Nx, Ny, cfg.t);
         t_spec(r) = toc;
         m1 = safe_memory_snapshot();
         m_spec(r) = mem_delta_mb(m0, m1);

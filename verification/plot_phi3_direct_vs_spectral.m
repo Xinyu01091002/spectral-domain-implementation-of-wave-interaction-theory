@@ -1,7 +1,7 @@
 clc; clear; close all;
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 outDir = fullfile(rootDir, 'outputs');
 if ~exist(outDir, 'dir'), mkdir(outDir); end
 
@@ -40,20 +40,22 @@ b = amp .* sin(ph);
 
 x = (0:Nx-1) * (Lx/Nx);
 y = (0:Ny-1) * (Ly/Ny);
-[X, Y] = meshgrid(x, y);
 
-% Compute coefficients
-c2 = coeffsMF12(2, g, h, a, b, kx, ky, Ux, Uy);
-c3 = coeffsMF12(3, g, h, a, b, kx, ky, Ux, Uy);
+% Compute coefficients using the two public workflows.
+c2_d = mf12_direct_coefficients(2, g, h, a, b, kx, ky, Ux, Uy);
+c3_d = mf12_direct_coefficients(3, g, h, a, b, kx, ky, Ux, Uy);
+c2_s = mf12_spectral_coefficients(2, g, h, a, b, kx, ky, Ux, Uy);
+c3_s = mf12_spectral_coefficients(3, g, h, a, b, kx, ky, Ux, Uy);
 
 % Direct method
-[~, phi2_d] = surfaceMF12_new(2, c2, X, Y, t);
-[~, phi3_d] = surfaceMF12_new(3, c3, X, Y, t);
+[X, Y] = meshgrid(x, y);
+[~, phi2_d] = mf12_direct_surface(2, c2_d, X, Y, t);
+[~, phi3_d] = mf12_direct_surface(3, c3_d, X, Y, t);
 phi3term_d = phi3_d - phi2_d;
 
 % Spectral method
-[~, phi2_s] = surfaceMF12_spectral(c2, Lx, Ly, Nx, Ny, t);
-[~, phi3_s] = surfaceMF12_spectral(c3, Lx, Ly, Nx, Ny, t);
+[~, phi2_s] = mf12_spectral_surface(c2_s, Lx, Ly, Nx, Ny, t);
+[~, phi3_s] = mf12_spectral_surface(c3_s, Lx, Ly, Nx, Ny, t);
 phi3term_s = phi3_s - phi2_s;
 
 % Differences

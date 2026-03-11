@@ -1,7 +1,7 @@
 clc;clear ;close all;
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 outDir = fullfile(rootDir, 'outputs');
 if ~exist(outDir, 'dir'), mkdir(outDir); end
 rehash toolboxcache;
@@ -135,20 +135,20 @@ fprintf('\n--- Method 1: Original MF12 (Full Coefficients) ---\n');
 tic;
 % 1st Order
 fprintf('  Computing 1st Order Coeffs...\n');
-coeffs1 = coeffsMF12(1, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
-[eta_mf12_1,~] = surfaceMF12_new(1, coeffs1, X_mesh, Y_mesh, tf);
+coeffs1 = mf12_direct_coefficients(1, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
+[eta_mf12_1,~] = mf12_direct_surface(1, coeffs1, X_mesh, Y_mesh, tf);
 
 % 2nd Order
 fprintf('  Computing 2nd Order Coeffs...\n');
-coeffs2 = coeffsMF12(2, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
-fprintf('  Reconstructing 2nd Order Surface (surfaceMF12_new)...\n');
-[eta_mf12_2,~] = surfaceMF12_new(2, coeffs2, X_mesh, Y_mesh, tf);
+coeffs2 = mf12_direct_coefficients(2, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
+fprintf('  Reconstructing 2nd Order Surface (mf12_direct_surface)...\n');
+[eta_mf12_2,~] = mf12_direct_surface(2, coeffs2, X_mesh, Y_mesh, tf);
 
 % 3rd Order
 fprintf('  Computing 3rd Order Coeffs (O(N^3))...\n');
-coeffs3 = coeffsMF12(3, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
-fprintf('  Reconstructing 3rd Order Surface (surfaceMF12_new)...\n');
-[eta_mf12_3,~] = surfaceMF12_new(3, coeffs3, X_mesh, Y_mesh, tf);
+coeffs3 = mf12_direct_coefficients(3, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
+fprintf('  Reconstructing 3rd Order Surface (mf12_direct_surface)...\n');
+[eta_mf12_3,~] = mf12_direct_surface(3, coeffs3, X_mesh, Y_mesh, tf);
 
 % Extract Pure Terms
 eta_mf12_3rd_term = eta_mf12_3 - eta_mf12_2;
@@ -182,21 +182,21 @@ fprintf('  >> Time: %.2f s\n', t_stream);
 % METHOD 3: Modified Superharmonic With Subharmonics (Verification)
 % =========================================================================
 fprintf('\n--- Method 3: Modified Superharmonic (With Subharmonics) ---\n');
-% Uses coeffsMF12_superharmonic (which we modified to include 2nd order subharmonics)
-% + surfaceMF12_spectral
+% Uses mf12_spectral_coefficients / mf12_spectral_surface
+% with the modified superharmonic coefficient path that includes 2nd-order subharmonics.
 
 % 1st Order
-coeffs_sup_1 = coeffsMF12_superharmonic(1, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
-[eta_sup_1, ~] = surfaceMF12_spectral(coeffs_sup_1, Lx, Ly, Nx, Ny, tf);
+coeffs_sup_1 = mf12_spectral_coefficients(1, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
+[eta_sup_1, ~] = mf12_spectral_surface(coeffs_sup_1, Lx, Ly, Nx, Ny, tf);
 
 % 2nd Order
-coeffs_sup_2 = coeffsMF12_superharmonic(2, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
-[eta_sup_2, ~] = surfaceMF12_spectral(coeffs_sup_2, Lx, Ly, Nx, Ny, tf);
+coeffs_sup_2 = mf12_spectral_coefficients(2, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
+[eta_sup_2, ~] = mf12_spectral_surface(coeffs_sup_2, Lx, Ly, Nx, Ny, tf);
 eta_sup_2nd_term = eta_sup_2 - eta_sup_1; % Remove linear
 
 % 3rd Order (Modified: Linear + 2nd(Sum+Diff) + 3rd(Sum Only))
-coeffs_sup_3 = coeffsMF12_superharmonic(3, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
-[eta_sup_3, ~] = surfaceMF12_spectral(coeffs_sup_3, Lx, Ly, Nx, Ny, tf);
+coeffs_sup_3 = mf12_spectral_coefficients(3, g, h, a_list, b_list, kx_list, ky_list, Ux, Uy);
+[eta_sup_3, ~] = mf12_spectral_surface(coeffs_sup_3, Lx, Ly, Nx, Ny, tf);
 
 % Compare 1st Order (Linear): Full (Method 2) vs Modified (Method 3)
 % Note: eta_stream_1 is Method 2's linear result.

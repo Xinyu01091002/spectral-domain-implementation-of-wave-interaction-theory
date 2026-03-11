@@ -8,7 +8,7 @@ close all;
 
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 
 outDir = fullfile(rootDir, 'outputs');
 if ~exist(outDir, 'dir'), mkdir(outDir); end
@@ -119,7 +119,7 @@ fprintf('Peak wavelength: %.1f m\n', lambda_p);
 fprintf('Directional wave-group focus: (x,y,t) = (%.1f, %.1f, %.1f)\n', xf, yf, t_focus);
 
 t_coeff = tic;
-coeffs = coeffsMF12_superharmonic(order, g, h, a, b, kx, ky, Ux, Uy, opts);
+coeffs = mf12_spectral_coefficients(order, g, h, a, b, kx, ky, Ux, Uy, opts);
 fprintf('Coefficient stage done in %.2f s\n', toc(t_coeff));
 fprintf('Storage mode: in-RAM\n');
 
@@ -131,7 +131,7 @@ for it = 1:numel(t_list)
     tt = t_list(it);
     fprintf('\nReconstruct at t = %.2f s ...\n', tt);
     t_rec = tic;
-    [eta, phi, X, Y] = surfaceMF12_spectral(coeffs, Lx, Ly, Nx, Ny, tt);
+    [eta, phi, X, Y] = mf12_spectral_surface(coeffs, Lx, Ly, Nx, Ny, tt);
     fprintf('  done in %.2f s\n', toc(t_rec));
     eta_all{it} = eta;
     phi_all{it} = phi;

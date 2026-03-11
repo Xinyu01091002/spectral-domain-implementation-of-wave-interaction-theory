@@ -1,7 +1,7 @@
 % BENCHMARK_DIRECT_VS_SPECTRAL_VSN
 % Compare end-to-end runtime vs N:
-%   Direct sum:      coeffsMF12 + surfaceMF12_new
-%   Spectral (new):  coeffsMF12_superharmonic + surfaceMF12_spectral
+%   Direct sum:      mf12_direct_coefficients + mf12_direct_surface
+%   Spectral (new):  mf12_spectral_coefficients + mf12_spectral_surface
 
 clc;
 clear;
@@ -9,7 +9,7 @@ close all;
 
 scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
-addpath(genpath(fullfile(rootDir, 'irregularWavesMF12')));
+run(fullfile(rootDir, 'setup_paths.m'));
 outDir = fullfile(rootDir, 'outputs');
 if ~exist(outDir, 'dir'), mkdir(outDir); end
 setenv('MF12_PROGRESS', '0');
@@ -119,21 +119,21 @@ for N = cfg.N_list
 
     for r = 1:cfg.repeats
         tic;
-        coeffs_d = coeffsMF12(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
+        coeffs_d = mf12_direct_coefficients(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy);
         t_direct_coeff(r) = toc;
 
         tic;
-        [eta_d, ~] = surfaceMF12_new(cfg.order, coeffs_d, X, Y, cfg.t);
+        [eta_d, ~] = mf12_direct_surface(cfg.order, coeffs_d, X, Y, cfg.t);
         t_direct_recon(r) = toc;
         t_direct_total(r) = t_direct_coeff(r) + t_direct_recon(r);
 
         tic;
-        coeffs_s = coeffsMF12_superharmonic(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy, struct('enable_subharmonic', false));
+        coeffs_s = mf12_spectral_coefficients(cfg.order, cfg.g, cfg.h, a, b, kx, ky, cfg.Ux, cfg.Uy, struct('enable_subharmonic', false));
         t_spectral_coeff(r) = toc;
         coeffs_s.third_order_subharmonic_mode = 'skip';
 
         tic;
-        [eta_s, ~] = surfaceMF12_spectral(coeffs_s, cfg.Lx, cfg.Ly, cfg.Nx, cfg.Ny, cfg.t);
+        [eta_s, ~] = mf12_spectral_surface(coeffs_s, cfg.Lx, cfg.Ly, cfg.Nx, cfg.Ny, cfg.t);
         t_spectral_recon(r) = toc;
         t_spectral_total(r) = t_spectral_coeff(r) + t_spectral_recon(r);
 

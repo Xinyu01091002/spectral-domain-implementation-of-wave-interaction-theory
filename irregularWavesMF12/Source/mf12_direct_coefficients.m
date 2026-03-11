@@ -1,9 +1,11 @@
-function [coeffs] = coeffsMF12(order,g,h,a,b,kx,ky,Ux,Uy, dispCoeffs)
+function [coeffs] = mf12_direct_coefficients(order,g,h,a,b,kx,ky,Ux,Uy, dispCoeffs)
 % A function to evaluate the third-order multi-directional irregular wave 
 % theory of Madsen & Fuhrman (2012) (MF12), also utilizing corrections from 
 % the appendix of Fuhrman et al. (2023).  Equation numbers in comments 
 % below correspond to those of MF12, with corrections also indicated when
 % relevant.
+%
+% This is the preferred direct-coefficient implementation name in this repository.
 %
 % References:
 %

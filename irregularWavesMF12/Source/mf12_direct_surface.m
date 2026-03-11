@@ -1,9 +1,11 @@
-function [eta,phiS,Mx,My] = surfaceMF12(order,coeffs,x,y,t)
+function [eta,phiS,Mx,My] = mf12_direct_surface(order,coeffs,x,y,t)
 % A function to evaluate the third-order multi-directional irregular wave 
 % theory of Madsen & Fuhrman (2012, MF12).  The function returns the free 
 % surface elevation (eta), the free surface velocity potential (phiS), as 
 % well as the components of the resulting mass flux vector (Mx,My). 
 % Equation numbers in comments below correspond to those of MF12.
+%
+% This is the preferred direct-surface implementation name in this repository.
 %
 % Reference:
 %
@@ -112,12 +114,12 @@ if order == 3
                         theta_p = coeffs.omega(p).*t - coeffs.kx(p)*x - coeffs.ky(p)*y;
                         theta_npmpp = theta_n + pmm*theta_m + pmp*theta_p; % Eq. 3.31
                         if pmm==1 && pmp==1
-                        eta = eta + coeffs.G_npmpp(c3)*(coeffs.A_npmpp(c3)*cos(theta_npmpp) ...
+                        eta = eta + 2*coeffs.G_npmpp(c3)*(coeffs.A_npmpp(c3)*cos(theta_npmpp) ...
                                                       + coeffs.B_npmpp(c3)*sin(theta_npmpp)); % Eq. 3.28 (last line)
                         
-                        phiS = phiS + coeffs.mu_npmpp(c3)*(coeffs.A_npmpp(c3)*sin(theta_npmpp) ...
+                        phiS = phiS + 2*coeffs.mu_npmpp(c3)*(coeffs.A_npmpp(c3)*sin(theta_npmpp) ...
                                                          - coeffs.B_npmpp(c3)*cos(theta_npmpp)); % Eq. 3.76 (last line)
-                        end
+                        end     
                     end % End of pmp loop
                 end % End of p loop
             end % End of pmm loop

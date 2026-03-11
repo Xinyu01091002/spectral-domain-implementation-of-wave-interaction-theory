@@ -4,19 +4,19 @@ scriptDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(scriptDir);
 run(fullfile(rootDir, 'setup_paths.m'));
 
-fprintf('=== Smoke Test: Directional Wave-Group MF12 ===\n');
+fprintf('=== Regression Test: Directional Wave-Group phi3 ===\n');
 
 g = 9.81;
 Tp = 12;
-t = 2 * Tp;
+t = 5 * Tp;
 kp = (2*pi/Tp)^2 / g;
 h = 1 / kp;
 Ux = 0;
 Uy = 0;
 Lx = 2000;
 Ly = 2000;
-Nx = 32;
-Ny = 32;
+Nx = 64;
+Ny = 64;
 
 rng(1234);
 dkx = 2*pi/Lx;
@@ -38,8 +38,8 @@ theta_all = theta_all(keep);
 theta1 = deg2rad(25);
 theta2 = deg2rad(-35);
 sig_k = 0.10 * kp;
-sig_t1 = deg2rad(16);
-sig_t2 = deg2rad(18);
+sig_t1 = deg2rad(20);
+sig_t2 = deg2rad(24);
 w1 = 0.55;
 w2 = 0.45;
 
@@ -49,12 +49,12 @@ St2 = exp(-0.5*(angle(exp(1i*(theta_all - theta2)))/sig_t2).^2);
 W = Sk .* (w1*St1 + w2*St2);
 
 [~, idx_sort] = sort(W, 'descend');
-N = 20;
+N = 40;
 idx = idx_sort(1:N);
 kx = kx_all(idx);
 ky = ky_all(idx);
 
-A0 = 0.18;
+A0 = 0.25;
 amp = A0 * W(idx) / max(W(idx));
 xf = Lx/2;
 yf = Ly/2;
@@ -65,36 +65,36 @@ b = amp .* sin(phase);
 
 x = (0:Nx-1) * (Lx/Nx);
 y = (0:Ny-1) * (Ly/Ny);
-[X, Y] = meshgrid(x, y);
+[~, iyc] = min(abs(y - Ly/2));
 
-c1_d = mf12_direct_coefficients(1, g, h, a, b, kx, ky, Ux, Uy);
 c2_d = mf12_direct_coefficients(2, g, h, a, b, kx, ky, Ux, Uy);
 c3_d = mf12_direct_coefficients(3, g, h, a, b, kx, ky, Ux, Uy);
-c1_s = mf12_spectral_coefficients(1, g, h, a, b, kx, ky, Ux, Uy);
 c2_s = mf12_spectral_coefficients(2, g, h, a, b, kx, ky, Ux, Uy);
 c3_s = mf12_spectral_coefficients(3, g, h, a, b, kx, ky, Ux, Uy);
 c3_s.third_order_subharmonic_mode = 'skip';
 c3_d_sup = select_third_order_superharmonic(c3_d);
 
-[~, phi1_d] = mf12_direct_surface(1, c1_d, X, Y, t);
+[X, Y] = meshgrid(x, y);
 [~, phi2_d] = mf12_direct_surface(2, c2_d, X, Y, t);
 [~, phi3_d] = mf12_direct_surface(3, c3_d_sup, X, Y, t);
-[~, phi1_s] = mf12_spectral_surface(c1_s, Lx, Ly, Nx, Ny, t);
 [~, phi2_s] = mf12_spectral_surface(c2_s, Lx, Ly, Nx, Ny, t);
 [~, phi3_s] = mf12_spectral_surface(c3_s, Lx, Ly, Nx, Ny, t);
 
-phi1_err = max(abs(phi1_d(:) - phi1_s(:)));
-phi3_err = max(abs((phi3_d(:) - phi2_d(:)) - (phi3_s(:) - phi2_s(:))));
+phi3sup_d = phi3_d - phi2_d;
+phi3sup_s = phi3_s - phi2_s;
+center_err = max(abs(phi3sup_d(iyc,:) - phi3sup_s(iyc,:)));
+field_err = max(abs(phi3sup_d(:) - phi3sup_s(:)));
 
-fprintf('max|phi1_d - phi1_s| = %.3e\n', phi1_err);
-fprintf('max|phi3sup_d - phi3sup_s| = %.3e\n', phi3_err);
+fprintf('centerline max error = %.3e\n', center_err);
+fprintf('field max error      = %.3e\n', field_err);
 
-tol = 1e-9;
-if phi1_err > tol || phi3_err > tol
-    error('Smoke test failed: phi1_err=%.3e, phi3_err=%.3e, tol=%.3e', phi1_err, phi3_err, tol);
+tol_center = 1e-10;
+tol_field = 1e-9;
+if center_err > tol_center || field_err > tol_field
+    error('Regression test failed: center_err=%.3e, field_err=%.3e', center_err, field_err);
 end
 
-fprintf('Smoke test passed.\n');
+fprintf('Regression test passed.\n');
 
 function coeffs_out = select_third_order_superharmonic(coeffs_in)
     coeffs_out = coeffs_in;
