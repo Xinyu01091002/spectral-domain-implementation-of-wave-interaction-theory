@@ -17,7 +17,7 @@ Lx =3000;
 Ly = 3000;
 Nx = 256;
 Ny = 256;
-t_eval = 60.0; % Default visualization at focus; use t_eval < 0 for pre-focus and t_eval > 0 for after-focus.
+t_eval = 24.0; % Default visualization at focus; use t_eval < 0 for pre-focus and t_eval > 0 for after-focus.
 
 % Build a directional wave-group-like spectrum in k-space
 rng(1234);
@@ -55,11 +55,11 @@ kw_vec(kmag_all <= kp) = kw_left;
 Sk = exp(-((kmag_all - kp).^2) ./ (2 * kw_vec.^2));
 
 group1_heading_deg = 45;
-group1_spread_deg = 30;
+group1_spread_deg = 5;
 group1_weight = 0.5;
 
-group2_heading_deg = -0;
-group2_spread_deg = 30;
+group2_heading_deg = -45;
+group2_spread_deg = 5;
 group2_weight = 0.5;
 
 D1 = gaussian_spreading(theta_all - deg2rad(group1_heading_deg), group1_spread_deg);
@@ -69,7 +69,7 @@ W = Sk .* (group1_weight * D1 + group2_weight * D2);
 crossing_angle_deg = abs(angle(exp(1i * deg2rad(group1_heading_deg - group2_heading_deg)))) * 180 / pi;
 fprintf('Surface script: crossing angle = %.2f deg.\n', crossing_angle_deg);
 
-energy_keep_frac = 0.99;
+energy_keep_frac = 0.999;
 [W_sorted, idx_sort] = sort(W, 'descend');
 cum_energy = cumsum(W_sorted);
 N = find(cum_energy >= energy_keep_frac * cum_energy(end), 1, 'first');

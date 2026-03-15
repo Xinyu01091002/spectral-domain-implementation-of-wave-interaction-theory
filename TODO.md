@@ -39,3 +39,24 @@ This checklist tracks the work needed to turn the current research workspace int
 - [x] Add contribution guidance for future collaborators.
 - [ ] Add release notes or a lightweight changelog.
 - [ ] Verify the repository can be cloned and run from a clean MATLAB session.
+
+## Phase 6: Cross-language implementations and performance benchmarking
+
+- [ ] Decide the scope of the non-MATLAB ports:
+  - C reference implementation of the core spectral reconstruction path
+  - Python implementation for accessibility and analysis workflows
+  - clarify whether the first target is spectral-only or both direct and spectral workflows
+- [ ] Define a shared benchmark case format so MATLAB, C, and Python run the same inputs and grids.
+- [ ] Add fixed validation cases with archived expected outputs so cross-language comparisons are numerical, not only visual.
+- [ ] Implement the core MF12 spectral reconstruction in C.
+- [ ] Implement the same reconstruction path in Python.
+- [ ] Decide whether Python should begin as pure NumPy or include an accelerated path (for example `numba`, `pybind11`, or a C extension).
+- [ ] Add a cross-language verification script that compares MATLAB, C, and Python outputs for `eta` and selected `phi` diagnostics.
+- [ ] Add a reproducible benchmark harness that records:
+  - coefficient-generation time
+  - reconstruction time
+  - total runtime
+  - grid size and number of wave components
+  - hardware and compiler/interpreter metadata
+- [ ] Archive benchmark outputs under `outputs/` and keep one reference log under `docs/benchmarks/`.
+- [ ] Document build and run instructions for the C and Python implementations in the README once the first working versions exist.

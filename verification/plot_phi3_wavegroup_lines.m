@@ -10,11 +10,11 @@ g = 9.81;
 h = 150;
 Ux = 0;
 Uy = 0;
-Lx = 5000;
-Ly = 5000;
-Nx = 128;
-Ny = 128;
-t_eval = 0.0;
+Lx = 3000;
+Ly = 3000;
+Nx = 256;
+Ny = 256;
+t_eval = 24.0;
 
 % Build a directional wave-group-like spectrum in k-space
 rng(1234);
@@ -42,7 +42,7 @@ omega_p = sqrt(g*kp*tanh(h*kp));
 Tp = 2*pi / omega_p;
 t_focus = 0.0; % By construction, both wave groups overlap at the domain center when t_eval = 0.
 
-Akp = 0.02;
+Akp = 0.35;
 kw_left = 0.004606;
 kw_right = kw_left;
 A_focus_total = Akp / kp;
@@ -51,13 +51,13 @@ kw_vec = kw_right * ones(size(kmag_all));
 kw_vec(kmag_all <= kp) = kw_left;
 Sk = exp(-((kmag_all - kp).^2) ./ (2 * kw_vec.^2));
 
-group1_heading_deg = 0;
-group1_spread_deg = 18;
-group1_weight = 0.55;
+group1_heading_deg = 45;
+group1_spread_deg = 5;
+group1_weight = 0.5;
 
-group2_heading_deg = -35;
-group2_spread_deg = 18;
-group2_weight = 0.45;
+group2_heading_deg = -45;
+group2_spread_deg = 5;
+group2_weight = 0.5;
 
 D1 = gaussian_spreading(theta_all - deg2rad(group1_heading_deg), group1_spread_deg);
 D2 = gaussian_spreading(theta_all - deg2rad(group2_heading_deg), group2_spread_deg);
@@ -66,8 +66,8 @@ W = Sk .* (group1_weight * D1 + group2_weight * D2);
 crossing_angle_deg = abs(angle(exp(1i * deg2rad(group1_heading_deg - group2_heading_deg)))) * 180 / pi;
 fprintf('Line script: crossing angle = %.2f deg.\n', crossing_angle_deg);
 
-energy_keep_frac = 0.9999;
-max_components = 120; % Safety cap for the direct third-order path.
+energy_keep_frac = 0.99;
+max_components = 200; % Safety cap for the direct third-order path.
 [W_sorted, idx_sort] = sort(W, 'descend');
 cum_energy = cumsum(W_sorted);
 N_energy = find(cum_energy >= energy_keep_frac * cum_energy(end), 1, 'first');
@@ -162,15 +162,25 @@ diag_s = {
 };
 labels = {'first harmonic', 'second superharmonic', 'second subharmonic', 'third superharmonic'};
 
-% Plot window: around envelope focus, in units of a few dominant wavelengths.
-half_window_lambda = 4.0;  % show +/- 4 lambda_p around focus (broader context)
-xwin = [max(0, xf - half_window_lambda*lambda_p), min(Lx, xf + half_window_lambda*lambda_p)];
-s_focus = min(xf, yf);     % focus projected on diagonal distance
-swin = [max(0, s_focus - half_window_lambda*lambda_p), min(Ldiag, s_focus + half_window_lambda*lambda_p)];
-xn = x / lambda_p;
-sn = s / lambda_p;
-xwin_n = xwin / lambda_p;
-swin_n = swin / lambda_p;
+% Plot window: center on the envelope peak of the computed response.
+phi_total_center_d = center_d{1} + center_d{2} + center_d{3} + center_d{4};
+phi_total_center_s = center_s{1} + center_s{2} + center_s{3} + center_s{4};
+phi_total_diag_d = diag_d{1} + diag_d{2} + diag_d{3} + diag_d{4};
+phi_total_diag_s = diag_s{1} + diag_s{2} + diag_s{3} + diag_s{4};
+
+[~, ix_peak_d] = max(local_envelope(phi_total_center_d));
+[~, ix_peak_s] = max(local_envelope(phi_total_center_s));
+[~, is_peak_d] = max(local_envelope(phi_total_diag_d));
+[~, is_peak_s] = max(local_envelope(phi_total_diag_s));
+
+x_center_plot = 0.5 * (x(ix_peak_d) + x(ix_peak_s));
+s_center_plot = 0.5 * (s(is_peak_d) + s(is_peak_s));
+
+half_window_lambda = 5.0;  % show +/- 5 lambda_p around the dominant envelope peak
+xn = (x - x_center_plot) / lambda_p;
+sn = (s - s_center_plot) / lambda_p;
+xwin_n = [-half_window_lambda, half_window_lambda];
+swin_n = [-half_window_lambda, half_window_lambda];
 
 % Report
 fprintf('Wave-group decomposed compare (Direct vs Spectral):\n');
@@ -397,4 +407,20 @@ function D = gaussian_spreading(theta, spread_angle_deg)
     theta_wrapped = angle(exp(1i * theta));
     sigma = deg2rad(spread_angle_deg);
     D = exp(-0.5 * (theta_wrapped / max(sigma, eps)).^2);
+end
+
+function env = local_envelope(sig)
+    sig = sig(:).';
+    valid = isfinite(sig);
+    if ~any(valid)
+        env = zeros(size(sig));
+        return;
+    end
+
+    if any(~valid)
+        idx = 1:numel(sig);
+        sig(~valid) = interp1(idx(valid), sig(valid), idx(~valid), 'linear', 'extrap');
+    end
+
+    env = abs(hilbert(sig));
 end
