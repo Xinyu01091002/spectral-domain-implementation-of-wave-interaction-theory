@@ -1,164 +1,238 @@
-# MF12 Spectral Reconstruction for Directional Wave Groups
+# MF12 Wave Reconstruction: MATLAB, Python, and C++
 
-This repository contains MATLAB code for nonlinear multidirectional wave reconstruction based on the third-order Madsen-Fuhrman 2012 (MF12) framework. The public interface is organized around two workflows:
+This repository implements and verifies nonlinear multidirectional wave reconstruction based on the third-order Madsen-Fuhrman 2012 (MF12) framework.
 
-- direct reconstruction: `mf12_direct_coefficients` + `mf12_direct_surface`
-- spectral reconstruction: `mf12_spectral_coefficients` + `mf12_spectral_surface`
+It now contains:
 
-The repository is still research-oriented, but the entry points below are intended to let a new user understand the codebase quickly and run a representative case from a clean MATLAB session.
+- a MATLAB reference implementation
+- a Python spectral port
+- a C++ spectral port
+- a shared cross-language verification and benchmarking workflow
 
-## Recent Updates
+MATLAB remains the numerical ground truth. Python and C++ are checked against MATLAB on shared deterministic cases.
 
-Recent cleanup and restructuring focused on making the repository easier to understand and easier to run as a public codebase:
+## Acknowledgement
 
-- standardized the preferred MF12 function names in `matlab/irregularWavesMF12/Source` around
-  `mf12_direct_coefficients`, `mf12_direct_surface`,
-  `mf12_spectral_coefficients`, and `mf12_spectral_surface`
-- removed legacy wrapper-style interfaces and unused bundled examples that were no longer part of the active workflow
-- simplified `matlab/setup_paths.m` so it only adds the MF12 source directory required by the current scripts
-- added clearer MATLAB entry points under `matlab/examples/`, `matlab/tests/`, `matlab/repro/`, and `matlab/verification/`
-- added a spectral-only 3D section visualization for crossing directional wave groups in
-  `matlab/verification/plot_phi3_wavegroup_surface_sections.m`
+This repository builds directly on the MATLAB implementation released by David R. Fuhrman through DTU Data:
 
-## Requirements
+- David R. Fuhrman, "Matlab implementation of the third-order, multi-directional, irregular wave theory of Madsen & Fuhrman (2012, J. Fluid Mech. 698, 304-334)", DTU Data, posted 2024-02-08:
+  https://data.dtu.dk/articles/code/Matlab_implementation_of_the_third-order_multi-directional_irregular_wave_theory_of_Madsen_Fuhrman_2012_J_Fluid_Mech_698_304-334_/22060124
 
-- MATLAB R2021a or newer is recommended
-- no nonstandard MATLAB toolboxes are currently required by the included entry points
+The coefficient computation in this repository follows that MATLAB implementation, and the retained MATLAB workflows here are used as the ground truth for verification of the Python and C++ ports.
 
-## Quick Start
+## What This Repo Does
 
-From the repository root in MATLAB:
+The core MF12 workflows are:
 
-```matlab
-run('matlab/setup_paths.m');
-```
+- direct reconstruction: build MF12 coefficients and evaluate the field directly in physical space
+- spectral reconstruction: build spectral coefficients and reconstruct the field efficiently on a regular grid
 
-Run one minimal example for each supported workflow:
+The main outputs are:
 
-```matlab
-run('matlab/examples/run_direct_minimal.m');
-run('matlab/examples/run_spectral_minimal.m');
-```
+- free-surface elevation `eta`
+- free-surface velocity potential `phi`
 
-Run the release-readiness smoke test:
+In practice, this repo is used for:
 
-```matlab
-run('matlab/tests/smoke_test_minimal.m');
-```
-
-Run one representative manuscript-facing reproduction script:
-
-```matlab
-run('matlab/repro/reproduce_manuscript_minimal.m');
-```
-
-## Where To Start
-
-- new user: run `matlab/examples/run_direct_minimal.m` or `matlab/examples/run_spectral_minimal.m`
-- reviewer or reproducer: start with `matlab/repro/reproduce_manuscript_minimal.m`
-- contributor: run `matlab/tests/smoke_test_minimal.m` before and after changes
-- manuscript-facing investigation: look under `matlab/verification/`
-
-## Main Workflows
-
-### Direct reconstruction
-
-The direct path builds MF12 coefficients in physical form and evaluates the reconstruction directly on a spatial grid:
-
-```matlab
-[X, Y] = meshgrid(x, y);
-coeffs = mf12_direct_coefficients(order, g, h, a, b, kx, ky, Ux, Uy);
-[eta, phi] = mf12_direct_surface(order, coeffs, X, Y, t);
-```
-
-This is the reference path used for direct-vs-spectral comparisons.
-
-### Spectral reconstruction
-
-The spectral path builds the superharmonic-oriented coefficient structure and reconstructs the field through FFT-based accumulation:
-
-```matlab
-coeffs = mf12_spectral_coefficients(order, g, h, a, b, kx, ky, Ux, Uy);
-[eta, phi] = mf12_spectral_surface(coeffs, Lx, Ly, Nx, Ny, t);
-```
-
-This is the primary high-performance path used in the benchmark and large-`N` verification scripts.
+- research verification of MF12 direct vs spectral implementations
+- focused wave-group and crossing-sea studies
+- benchmark comparisons of accuracy and speed
+- cross-language port validation against the MATLAB reference
 
 ## Repository Layout
 
 ```text
 .
-|- matlab/                MATLAB implementation, examples, tests, and verification scripts
-|- python/                Python spectral port, tests, and helper scripts
-|- c/                     reserved home for the future C or C++ implementation
-|- cross_language_comparison/  shared cases, comparison workflow notes, and language-neutral metadata
-|- docs/                  supporting repository notes and archived reference logs
-|- outputs/               generated outputs, ignored by git
-|- TODO.md                repository cleanup checklist
+|- matlab/                     MATLAB reference implementation and research scripts
+|- python/                     Python spectral port, tests, and plotting helpers
+|- cpp/                        C++ spectral port and build files
+|- cross_language_comparison/  shared cases, comparison metadata, and workflow notes
+|- docs/                       supporting notes and archived benchmark logs
+|- outputs/                    generated results and figures
+|- TODO.md
 |- LICENSE
 `- README.md
 ```
 
-## Recommended Entry Points
+More specifically:
 
-- `matlab/setup_paths.m`: add the MF12 source directory to the MATLAB path
-- `matlab/irregularWavesMF12/Source/mf12_direct_coefficients.m`, `matlab/irregularWavesMF12/Source/mf12_direct_surface.m`: preferred direct-workflow entry points
-- `matlab/irregularWavesMF12/Source/mf12_spectral_coefficients.m`, `matlab/irregularWavesMF12/Source/mf12_spectral_surface.m`: preferred spectral-workflow entry points
-- `matlab/examples/run_direct_minimal.m`: smallest direct reconstruction example
-- `matlab/examples/run_spectral_minimal.m`: smallest spectral reconstruction example
-- `matlab/tests/smoke_test_minimal.m`: fast direct-vs-spectral consistency check
-- `matlab/tests/regression_wavegroup_phi3.m`: representative directional wave-group regression check
-- `matlab/repro/reproduce_manuscript_minimal.m`: minimal manuscript reproduction
+- [matlab](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab) contains the MF12 reference implementation, examples, tests, reproduction scripts, and verification plots.
+- [python](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/python) contains the Python spectral-only package, CLI, tests, and plotting/benchmark helpers.
+- [cpp](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cpp) contains the C++ spectral port and its CMake-based build.
+- [cross_language_comparison](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cross_language_comparison) contains shared cases and the MATLAB/Python/C++ comparison workflow.
 
-## Verification and Benchmark Scripts
+## Current Status
 
-The scripts under `matlab/verification/` are manuscript-facing and remain closer to the research workflow than to a polished package API. The most useful ones for understanding current usage are:
+- MATLAB direct and spectral workflows are the reference implementation.
+- Python matches MATLAB on the shared spectral cases to machine precision.
+- C++ matches MATLAB on the shared spectral cases to machine precision.
+- the MATLAB coefficient and reconstruction workflow in this repository follows and is verified against the DTU MATLAB release by David R. Fuhrman
+- Shared regression cases currently include:
+  - `minimal_small`
+  - `wavegroup_regression`
+  - `benchmark_medium`
 
-- `plot_phi3_wavegroup_lines.m`
-- `plot_phi3_wavegroup_surface_sections.m`
-- `plot_eta_wavegroup_lines.m`
-- `compare_crossing_sea_methods.m`
-- `benchmark_direct_vs_spectral_vsN.m`
-- `benchmark_mf12_speed_memory.m`
-- `test_new_spectral_realistic_sea_highN.m`
+## Quick Start
 
-These scripts are the best references for how the two reconstruction pipelines are used in realistic directional and crossing-sea cases.
+### MATLAB
 
-In particular:
+From the repository root in MATLAB:
 
-- `plot_phi3_wavegroup_lines.m` compares direct and spectral reconstructions for directional or crossing wave-group sections
-- `plot_phi3_wavegroup_surface_sections.m` provides a spectral-only 3D visualization with centerline/diagonal section overlays for focused crossing wave groups
+```matlab
+run('matlab/setup_paths.m');
+run('matlab/examples/run_direct_minimal.m');
+run('matlab/examples/run_spectral_minimal.m');
+run('matlab/tests/smoke_test_minimal.m');
+```
 
-## Relationship to Bundled MF12 Code
+Useful MATLAB entry points:
 
-The directory `matlab/irregularWavesMF12/` contains the bundled MF12 source implementation used by this repository. This repository adds public-facing examples, smoke tests, manuscript reproduction entry points, and verification scripts centered on direct versus spectral reconstruction.
+- [run_direct_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/examples/run_direct_minimal.m)
+- [run_spectral_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/examples/run_spectral_minimal.m)
+- [smoke_test_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/tests/smoke_test_minimal.m)
+- [plot_phi3_wavegroup_lines.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_phi3_wavegroup_lines.m)
 
-The `mf12_*` function names in `matlab/irregularWavesMF12/Source` are the preferred public and implementation names in this repository.
+### Python
 
-Inside `matlab/irregularWavesMF12/Source`, the preferred clear-name aliases are:
+Recommended setup from the repository root:
+
+```powershell
+python -m pip install -e python
+```
+
+Or without installation:
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path 'python/src').Path
+```
+
+Useful commands:
+
+```powershell
+python -m unittest discover python/tests
+python -m mf12_python.cli verify cross_language_comparison/cases/minimal_small --repeats 1
+python python/scripts/run_benchmarks.py
+python python/scripts/compare_python_cpp_matlab.py cross_language_comparison/cases/minimal_small cross_language_comparison/cases/wavegroup_regression cross_language_comparison/cases/benchmark_medium
+```
+
+### C++
+
+Build from the repository root:
+
+```powershell
+cmake -S cpp -B cpp/build -G Ninja -DCMAKE_CXX_COMPILER=g++
+cmake --build cpp/build
+```
+
+Useful commands:
+
+```powershell
+cpp/build/mf12_cpp.exe inspect cross_language_comparison/cases/minimal_small
+cpp/build/mf12_cpp.exe validate cross_language_comparison/cases/minimal_small
+cpp/build/mf12_cpp.exe verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp/minimal_small
+```
+
+## Core MATLAB APIs
+
+The preferred MF12 function entry points are:
 
 - `mf12_direct_coefficients`
-- `mf12_spectral_coefficients`
 - `mf12_direct_surface`
+- `mf12_spectral_coefficients`
 - `mf12_spectral_surface`
 
-If the repository is prepared for a more formal release later, this boundary should likely be made more explicit, for example by moving the bundled code under a dedicated `external/` or `third_party/` location.
+Typical usage:
 
-## Reproducibility Notes
+```matlab
+coeffs_direct = mf12_direct_coefficients(order, g, h, a, b, kx, ky, Ux, Uy);
+[eta_direct, phi_direct] = mf12_direct_surface(order, coeffs_direct, X, Y, t);
 
-- generated figures and logs should go under `outputs/`
-- a sample benchmark log is archived in `docs/benchmarks/`
-- the current reproduction entry point intentionally covers one representative manuscript case rather than every figure in the paper
+coeffs_spec = mf12_spectral_coefficients(order, g, h, a, b, kx, ky, Ux, Uy);
+[eta_spec, phi_spec] = mf12_spectral_surface(coeffs_spec, Lx, Ly, Nx, Ny, t);
+```
 
-## Cross-Language Scaffold
+## Cross-Language Workflow
 
-A Python-first spectral-only cross-language scaffold now lives under `python/`, with shared MATLAB-ground-truth cases under `cross_language_comparison/cases/` and the exporter at `matlab/repro/export_cross_language_cases.m`.
+The shared workflow uses MATLAB as ground truth and compares Python and C++ against the same archived reference outputs.
 
-See `cross_language_comparison/README.md` for the shared case format, verification flow, and benchmark entry points.
+### 1. Export or refresh shared MATLAB cases
+
+In MATLAB:
+
+```matlab
+run('matlab/repro/export_cross_language_cases.m');
+```
+
+This writes shared deterministic cases under [cross_language_comparison/cases](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cross_language_comparison/cases).
+
+### 2. Verify Python or C++ against MATLAB
+
+Python:
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path 'python/src').Path
+python -m mf12_python.cli verify cross_language_comparison/cases/wavegroup_regression --repeats 1
+```
+
+C++:
+
+```powershell
+cpp/build/mf12_cpp.exe verify cross_language_comparison/cases/wavegroup_regression outputs/cross_language_comparison/verify_cpp/wavegroup_regression
+```
+
+### 3. Generate comparison summaries and figures
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path 'python/src').Path
+python python/scripts/compare_python_cpp_matlab.py cross_language_comparison/cases/minimal_small cross_language_comparison/cases/wavegroup_regression cross_language_comparison/cases/benchmark_medium
+python python/scripts/plot_component_lines_python_cpp_matlab.py
+python python/scripts/plot_third_order_python_cpp_matlab.py
+```
+
+Typical outputs are written under [outputs/cross_language_comparison](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/outputs/cross_language_comparison).
+
+## Shared Case Format
+
+Each shared case folder contains:
+
+- `case.json`: scalar inputs, metadata, file paths, and tolerances
+- `inputs/*.csv`: input arrays such as `a`, `b`, `kx`, and `ky`
+- `reference/matlab/*.csv`: MATLAB reference `eta`, `phi`, `x`, and `y`
+- `reference/matlab/result.json`: MATLAB runtime metadata
+
+For the wave-group line-comparison figures, MATLAB component references are also archived under:
+
+- `reference/matlab_components/`
+
+## Recommended Starting Points
+
+- new MATLAB user:
+  - [run_spectral_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/examples/run_spectral_minimal.m)
+- direct-vs-spectral reference check:
+  - [smoke_test_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/tests/smoke_test_minimal.m)
+- wave-group verification figure:
+  - [plot_phi3_wavegroup_lines.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_phi3_wavegroup_lines.m)
+- Python validation:
+  - [cli.py](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/python/src/mf12_python/cli.py)
+- C++ validation:
+  - [main.cpp](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cpp/src/main.cpp)
+
+## Outputs and Generated Files
+
+- Generated figures, verification results, and benchmark summaries go under [outputs](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/outputs).
+- C++ build artifacts now live under [cpp/build](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cpp/build).
+- `outputs/` and `cpp/build/` are generated folders and should not be versioned.
+
+## Language-Specific Notes
+
+See these for more focused usage details:
+
+- [matlab/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/README.md)
+- [python/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/python/README.md)
+- [cpp/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cpp/README.md)
+- [cross_language_comparison/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cross_language_comparison/README.md)
 
 ## Citation and License
 
-- license: MIT, see `LICENSE`
-- software citation metadata: `CITATION.cff`
-
-Until the citation metadata is finalized, update the placeholder author and repository information in `CITATION.cff` before public release.
+- License: MIT, see [LICENSE](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/LICENSE)
+- Citation metadata: [CITATION.cff](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/CITATION.cff)

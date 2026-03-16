@@ -12,6 +12,7 @@ Current status:
 - `cross_language_comparison/`: shared portable cases plus this workflow note
 - `cross_language_comparison/cases/`: language-neutral validation and benchmark cases
 - `python/`: Python package, tests, and helper scripts for the spectral-only MF12 path
+- `cpp/`: C++ scaffold that reads the same shared case format
 - `matlab/repro/`: MATLAB exporters that materialize shared cases and MATLAB-only reference artifacts
 
 ## Workflow
@@ -36,6 +37,27 @@ $env:PYTHONPATH = (Resolve-Path 'python/src').Path
 python python/scripts/run_benchmarks.py
 ```
 
+4. Build the C++ case-inspection scaffold when a C++ compiler is available:
+
+```powershell
+cmake -S cpp -B cpp/build
+cmake --build cpp/build
+cpp/build/mf12_cpp inspect cross_language_comparison/cases/minimal_small
+```
+
+5. Run the current C++ order-2 verification path on the smallest shared case:
+
+```powershell
+cpp/build/mf12_cpp verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp/minimal_small
+```
+
+6. Generate a Python-vs-C++-vs-MATLAB summary across the shared cases:
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path 'python/src').Path
+python python/scripts/compare_python_cpp_matlab.py cross_language_comparison/cases/minimal_small cross_language_comparison/cases/wavegroup_regression cross_language_comparison/cases/benchmark_medium
+```
+
 ## Case And Result Format
 
 Each case folder contains:
@@ -53,6 +75,19 @@ Python verification outputs write:
 - `y.csv`
 - `result.json`
 
+The C++ scaffold currently reads the same case format and now supports:
+
+- a fully matching `minimal_small` run
+- an in-progress third-order path for the larger cases
+
+As the solver grows, it should keep writing the same result bundle shape as Python:
+
+- `eta.csv`
+- `phi.csv`
+- `x.csv`
+- `y.csv`
+- `result.json`
+
 The comparison metrics reported today are:
 
 - `eta_max_abs_err`, `phi_max_abs_err`
@@ -63,7 +98,7 @@ The comparison metrics reported today are:
 
 ## Porting Note
 
-One important implementation trap showed up during the Python port and should be preserved for future C/C++ work:
+One important implementation trap showed up during the Python port and should be preserved for future C++ work:
 
 - `Lambda3` is easy to mistranscribe because only its first grouped contribution is multiplied by the leading `h^2 / (4 * beta)` prefactor.
 - The later `Fnpm`, `Fnpp`, `Fmpp`, `Gnpm`, `Gnpp`, and `Gmpp` terms are separate additive terms with their own `1 / beta` scaling.

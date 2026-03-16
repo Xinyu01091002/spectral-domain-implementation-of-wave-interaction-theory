@@ -27,7 +27,7 @@ def main() -> None:
 
     case = load_case(args.case_dir)
     matlab = load_matlab_components(Path(args.case_dir))
-    python = compute_python_components(case, matlab["k2_cut"])
+    python = compute_python_components(case, matlab["k2_cut"], matlab["s"])
     make_figure(case, matlab, python, Path(args.output))
 
 
@@ -44,7 +44,7 @@ def load_matlab_components(case_dir: Path) -> dict:
     }
 
 
-def compute_python_components(case: dict, k2_cut: float) -> dict:
+def compute_python_components(case: dict, k2_cut: float, s_ref: np.ndarray) -> dict:
     inp = case["inputs"]
     arr = case["arrays"]
     coeff1 = spectral_coefficients(1, inp["g"], inp["h"], arr["a"], arr["b"], arr["kx"], arr["ky"], inp["Ux"], inp["Uy"], {"enable_subharmonic": False})
@@ -67,7 +67,7 @@ def compute_python_components(case: dict, k2_cut: float) -> dict:
     y_axis = case["reference"]["loaded_arrays"]["y"].reshape(-1)
     x_grid, y_grid = np.meshgrid(x_axis, y_axis)
     iyc = int(np.argmin(np.abs(y_axis - inp["Ly"] / 2.0)))
-    s = np.linspace(0.0, min(inp["Lx"], inp["Ly"]), inp["Nx"])
+    s = np.asarray(s_ref, dtype=float).reshape(-1)
 
     center = np.vstack([phi1[iyc, :], phi2sup[iyc, :], phi2sub[iyc, :], phi3[iyc, :]])
     diag = np.vstack(
@@ -112,6 +112,8 @@ def interp_line(x_grid: np.ndarray, y_grid: np.ndarray, field: np.ndarray, s: np
 
 
 def bilinear_interp(x_axis: np.ndarray, y_axis: np.ndarray, field: np.ndarray, x: float, y: float) -> float:
+    if x < x_axis[0] or x > x_axis[-1] or y < y_axis[0] or y > y_axis[-1]:
+        return float("nan")
     ix = np.searchsorted(x_axis, x, side="right") - 1
     iy = np.searchsorted(y_axis, y, side="right") - 1
     ix = np.clip(ix, 0, len(x_axis) - 2)

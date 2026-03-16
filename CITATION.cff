@@ -1,16 +1,27 @@
 cff-version: 1.2.0
-title: "MF12 Spectral Reconstruction for Directional Wave Groups"
-message: "If you use this repository, please cite the software and the associated manuscript."
+title: "MF12 Wave Reconstruction: MATLAB, Python, and C++"
+message: "If you use this repository, please cite this software. Because the coefficient implementation follows and is verified against the DTU MATLAB release by David R. Fuhrman, please also acknowledge that original implementation where appropriate."
 type: software
 authors:
-  - family-names: "To Be Updated"
-    given-names: "Repository Authors"
-repository-code: "https://github.com/TO-BE-UPDATED/mf12-spectral-directional-wave-reconstruction"
+  - family-names: "Liu"
+    given-names: "Xinyu"
+repository-code: "https://github.com/Xinyu01091002/spectral-domain-implementation-of-wave-interaction-theory"
+url: "https://github.com/Xinyu01091002/spectral-domain-implementation-of-wave-interaction-theory"
 license: "MIT"
-abstract: "MATLAB implementations for direct and spectral reconstruction of nonlinear multidirectional wave fields based on the MF12 framework."
+abstract: "Reference and cross-language implementations of nonlinear multidirectional wave reconstruction based on the third-order Madsen-Fuhrman 2012 framework, including MATLAB ground-truth workflows and validated Python and C++ spectral ports. The coefficient workflow follows and is verified against the DTU MATLAB implementation released by David R. Fuhrman."
 keywords:
   - MATLAB
+  - Python
+  - C++
   - wave reconstruction
   - MF12
   - spectral method
   - irregular waves
+references:
+  - type: software
+    authors:
+      - family-names: "Fuhrman"
+        given-names: "David R."
+    title: "Matlab implementation of the third-order, multi-directional, irregular wave theory of Madsen & Fuhrman (2012, J. Fluid Mech. 698, 304-334)"
+    url: "https://data.dtu.dk/articles/code/Matlab_implementation_of_the_third-order_multi-directional_irregular_wave_theory_of_Madsen_Fuhrman_2012_J_Fluid_Mech_698_304-334_/22060124"
+    date-released: 2024-02-08

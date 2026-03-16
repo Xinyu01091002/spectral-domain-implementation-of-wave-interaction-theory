@@ -4,6 +4,10 @@
     "cross_language_comparison/cases/wavegroup_regression",
     "cross_language_comparison/cases/benchmark_medium"
   ],
+  "cpp_defaults": {
+    "build_dir": "cpp/build",
+    "target": "mf12_cpp"
+  },
   "python_defaults": {
     "repeats": 3,
     "warmup": true
