@@ -1,0 +1,11 @@
+{
+  "cases": [
+    "cross_language_comparison/cases/minimal_small",
+    "cross_language_comparison/cases/wavegroup_regression",
+    "cross_language_comparison/cases/benchmark_medium"
+  ],
+  "python_defaults": {
+    "repeats": 3,
+    "warmup": true
+  }
+}

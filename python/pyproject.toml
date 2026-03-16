@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mf12-python"
+version = "0.1.0"
+description = "Python spectral-only MF12 reconstruction with MATLAB-ground-truth verification"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,10 @@
+{
+  "labels": [
+    "first harmonic",
+    "second superharmonic",
+    "second subharmonic",
+    "third superharmonic"
+  ],
+  "reference": "MATLAB spectral",
+  "k2_cut": 0.039556769463644836
+}

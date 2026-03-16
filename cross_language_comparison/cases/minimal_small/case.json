@@ -1,0 +1,41 @@
+{
+  "case_id": "minimal_small",
+  "description": "Small deterministic sanity case based on the minimal spectral example.",
+  "purpose": "sanity",
+  "inputs": {
+    "order": 2,
+    "g": 9.81,
+    "h": 40,
+    "Ux": 0,
+    "Uy": 0,
+    "Lx": 400,
+    "Ly": 400,
+    "Nx": 64,
+    "Ny": 64,
+    "t": 0,
+    "subharmonic_mode": "skip"
+  },
+  "arrays": {
+    "a": "inputs\\a.csv",
+    "b": "inputs\\b.csv",
+    "kx": "inputs\\kx.csv",
+    "ky": "inputs\\ky.csv"
+  },
+  "reference": {
+    "arrays": {
+      "eta": "reference\\matlab\\eta.csv",
+      "phi": "reference\\matlab\\phi.csv",
+      "x": "reference\\matlab\\x.csv",
+      "y": "reference\\matlab\\y.csv"
+    },
+    "metadata": "reference\\matlab\\result.json"
+  },
+  "tolerances": {
+    "eta_max_abs_err": 1E-9,
+    "phi_max_abs_err": 1E-9,
+    "eta_rms_err": 1E-10,
+    "phi_rms_err": 1E-10,
+    "eta_relative_l2_err": 1E-10,
+    "phi_relative_l2_err": 1E-10
+  }
+}

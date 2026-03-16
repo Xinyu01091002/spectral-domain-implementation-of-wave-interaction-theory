@@ -11,14 +11,14 @@ The repository is still research-oriented, but the entry points below are intend
 
 Recent cleanup and restructuring focused on making the repository easier to understand and easier to run as a public codebase:
 
-- standardized the preferred MF12 function names in `irregularWavesMF12/Source` around
+- standardized the preferred MF12 function names in `matlab/irregularWavesMF12/Source` around
   `mf12_direct_coefficients`, `mf12_direct_surface`,
   `mf12_spectral_coefficients`, and `mf12_spectral_surface`
 - removed legacy wrapper-style interfaces and unused bundled examples that were no longer part of the active workflow
-- simplified `setup_paths.m` so it only adds the MF12 source directory required by the current scripts
-- added clearer examples, tests, and manuscript-facing entry points under `examples/`, `tests/`, `repro/`, and `verification/`
+- simplified `matlab/setup_paths.m` so it only adds the MF12 source directory required by the current scripts
+- added clearer MATLAB entry points under `matlab/examples/`, `matlab/tests/`, `matlab/repro/`, and `matlab/verification/`
 - added a spectral-only 3D section visualization for crossing directional wave groups in
-  `verification/plot_phi3_wavegroup_surface_sections.m`
+  `matlab/verification/plot_phi3_wavegroup_surface_sections.m`
 
 ## Requirements
 
@@ -30,34 +30,34 @@ Recent cleanup and restructuring focused on making the repository easier to unde
 From the repository root in MATLAB:
 
 ```matlab
-setup_paths;
+run('matlab/setup_paths.m');
 ```
 
 Run one minimal example for each supported workflow:
 
 ```matlab
-run('examples/run_direct_minimal.m');
-run('examples/run_spectral_minimal.m');
+run('matlab/examples/run_direct_minimal.m');
+run('matlab/examples/run_spectral_minimal.m');
 ```
 
 Run the release-readiness smoke test:
 
 ```matlab
-run('tests/smoke_test_minimal.m');
+run('matlab/tests/smoke_test_minimal.m');
 ```
 
 Run one representative manuscript-facing reproduction script:
 
 ```matlab
-run('repro/reproduce_manuscript_minimal.m');
+run('matlab/repro/reproduce_manuscript_minimal.m');
 ```
 
 ## Where To Start
 
-- new user: run `examples/run_direct_minimal.m` or `examples/run_spectral_minimal.m`
-- reviewer or reproducer: start with `repro/reproduce_manuscript_minimal.m`
-- contributor: run `tests/smoke_test_minimal.m` before and after changes
-- manuscript-facing investigation: look under `verification/`
+- new user: run `matlab/examples/run_direct_minimal.m` or `matlab/examples/run_spectral_minimal.m`
+- reviewer or reproducer: start with `matlab/repro/reproduce_manuscript_minimal.m`
+- contributor: run `matlab/tests/smoke_test_minimal.m` before and after changes
+- manuscript-facing investigation: look under `matlab/verification/`
 
 ## Main Workflows
 
@@ -88,15 +88,12 @@ This is the primary high-performance path used in the benchmark and large-`N` ve
 
 ```text
 .
-|- irregularWavesMF12/    bundled MF12 source tree used by this repository
+|- matlab/                MATLAB implementation, examples, tests, and verification scripts
+|- python/                Python spectral port, tests, and helper scripts
+|- c/                     reserved home for the future C or C++ implementation
+|- cross_language_comparison/  shared cases, comparison workflow notes, and language-neutral metadata
 |- docs/                  supporting repository notes and archived reference logs
-|- examples/              minimal runnable examples for new users
-|- repro/                 lightweight manuscript reproduction entry points
-|- tests/                 fast validation checks
-|- verification/          manuscript-facing verification and benchmark scripts
 |- outputs/               generated outputs, ignored by git
-|- setup_paths.m          adds the MF12 source directory to the MATLAB path
-|- manuscript.tex         manuscript source for the associated paper
 |- TODO.md                repository cleanup checklist
 |- LICENSE
 `- README.md
@@ -104,18 +101,18 @@ This is the primary high-performance path used in the benchmark and large-`N` ve
 
 ## Recommended Entry Points
 
-- `setup_paths.m`: add the MF12 source directory to the MATLAB path
-- `irregularWavesMF12/Source/mf12_direct_coefficients.m`, `irregularWavesMF12/Source/mf12_direct_surface.m`: preferred direct-workflow entry points
-- `irregularWavesMF12/Source/mf12_spectral_coefficients.m`, `irregularWavesMF12/Source/mf12_spectral_surface.m`: preferred spectral-workflow entry points
-- `examples/run_direct_minimal.m`: smallest direct reconstruction example
-- `examples/run_spectral_minimal.m`: smallest spectral reconstruction example
-- `tests/smoke_test_minimal.m`: fast direct-vs-spectral consistency check
-- `tests/regression_wavegroup_phi3.m`: representative directional wave-group regression check
-- `repro/reproduce_manuscript_minimal.m`: minimal manuscript reproduction
+- `matlab/setup_paths.m`: add the MF12 source directory to the MATLAB path
+- `matlab/irregularWavesMF12/Source/mf12_direct_coefficients.m`, `matlab/irregularWavesMF12/Source/mf12_direct_surface.m`: preferred direct-workflow entry points
+- `matlab/irregularWavesMF12/Source/mf12_spectral_coefficients.m`, `matlab/irregularWavesMF12/Source/mf12_spectral_surface.m`: preferred spectral-workflow entry points
+- `matlab/examples/run_direct_minimal.m`: smallest direct reconstruction example
+- `matlab/examples/run_spectral_minimal.m`: smallest spectral reconstruction example
+- `matlab/tests/smoke_test_minimal.m`: fast direct-vs-spectral consistency check
+- `matlab/tests/regression_wavegroup_phi3.m`: representative directional wave-group regression check
+- `matlab/repro/reproduce_manuscript_minimal.m`: minimal manuscript reproduction
 
 ## Verification and Benchmark Scripts
 
-The scripts under `verification/` are manuscript-facing and remain closer to the research workflow than to a polished package API. The most useful ones for understanding current usage are:
+The scripts under `matlab/verification/` are manuscript-facing and remain closer to the research workflow than to a polished package API. The most useful ones for understanding current usage are:
 
 - `plot_phi3_wavegroup_lines.m`
 - `plot_phi3_wavegroup_surface_sections.m`
@@ -134,11 +131,11 @@ In particular:
 
 ## Relationship to Bundled MF12 Code
 
-The directory `irregularWavesMF12/` contains the bundled MF12 source implementation used by this repository. This repository adds public-facing examples, smoke tests, manuscript reproduction entry points, and verification scripts centered on direct versus spectral reconstruction.
+The directory `matlab/irregularWavesMF12/` contains the bundled MF12 source implementation used by this repository. This repository adds public-facing examples, smoke tests, manuscript reproduction entry points, and verification scripts centered on direct versus spectral reconstruction.
 
-The `mf12_*` function names in `irregularWavesMF12/Source` are the preferred public and implementation names in this repository.
+The `mf12_*` function names in `matlab/irregularWavesMF12/Source` are the preferred public and implementation names in this repository.
 
-Inside `irregularWavesMF12/Source`, the preferred clear-name aliases are:
+Inside `matlab/irregularWavesMF12/Source`, the preferred clear-name aliases are:
 
 - `mf12_direct_coefficients`
 - `mf12_spectral_coefficients`
@@ -152,6 +149,12 @@ If the repository is prepared for a more formal release later, this boundary sho
 - generated figures and logs should go under `outputs/`
 - a sample benchmark log is archived in `docs/benchmarks/`
 - the current reproduction entry point intentionally covers one representative manuscript case rather than every figure in the paper
+
+## Cross-Language Scaffold
+
+A Python-first spectral-only cross-language scaffold now lives under `python/`, with shared MATLAB-ground-truth cases under `cross_language_comparison/cases/` and the exporter at `matlab/repro/export_cross_language_cases.m`.
+
+See `cross_language_comparison/README.md` for the shared case format, verification flow, and benchmark entry points.
 
 ## Citation and License
 

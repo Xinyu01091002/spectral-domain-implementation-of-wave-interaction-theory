@@ -7,7 +7,7 @@ This repository is still organized around an active research workflow, so contri
 - preserve the two main method pipelines already used by the verification scripts:
   - direct: `mf12_direct_coefficients` + `mf12_direct_surface`
   - spectral: `mf12_spectral_coefficients` + `mf12_spectral_surface`
-- prefer the clearer public `mf12_*` names from `irregularWavesMF12/Source` in new user-facing examples and documentation
+- prefer the clearer public `mf12_*` names from `matlab/irregularWavesMF12/Source` in new user-facing examples and documentation
 - avoid changing scientific behavior unless the change is documented and validated
 - keep generated figures, logs, and temporary outputs out of tracked source directories
 
@@ -21,11 +21,11 @@ This repository is still organized around an active research workflow, so contri
 ## Before submitting changes
 
 - run the smallest relevant entry point you touched
-- run `tests/smoke_test_minimal.m` for general release-readiness
-- if you changed a reconstruction path, also run `tests/regression_wavegroup_phi3.m`
+- run `matlab/tests/smoke_test_minimal.m` for general release-readiness
+- if you changed a reconstruction path, also run `matlab/tests/regression_wavegroup_phi3.m`
 
 ## Notes
 
 - update `CITATION.cff` before public release
-- do not move `manuscript.tex` or the bundled `irregularWavesMF12/` tree without checking downstream references first
-- delete files only after confirming they are not used by `README`, `examples`, `tests`, `repro`, or the retained `verification` scripts
+- do not move `manuscript.tex` or the bundled `matlab/irregularWavesMF12/` tree without checking downstream references first
+- delete files only after confirming they are not used by `README`, `matlab/examples`, `matlab/tests`, `matlab/repro`, or the retained `matlab/verification` scripts

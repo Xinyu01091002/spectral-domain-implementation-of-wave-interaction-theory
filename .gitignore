@@ -3,6 +3,8 @@
 *.m~
 *.autosave
 *.mlx.lock
+__pycache__/
+*.pyc
 slprj/
 codegen/
 simulink_cache/

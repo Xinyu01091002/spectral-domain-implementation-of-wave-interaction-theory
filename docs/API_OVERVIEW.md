@@ -25,20 +25,20 @@ Use this path for FFT-based reconstruction and large-`N` performance studies.
 
 ## Supporting entry points
 
-- `setup_paths.m`: adds the bundled MF12 source tree to the MATLAB path
-- `irregularWavesMF12/Source/mf12_direct_coefficients.m`: preferred public name for direct coefficient generation
-- `irregularWavesMF12/Source/mf12_direct_surface.m`: preferred public name for direct reconstruction
-- `irregularWavesMF12/Source/mf12_spectral_coefficients.m`: preferred public name for spectral coefficient generation
-- `irregularWavesMF12/Source/mf12_spectral_surface.m`: preferred public name for spectral reconstruction
-- `examples/run_direct_minimal.m`: smallest direct example
-- `examples/run_spectral_minimal.m`: smallest spectral example
-- `tests/smoke_test_minimal.m`: fast release-readiness check
-- `tests/regression_wavegroup_phi3.m`: more representative directional wave-group comparison
-- `repro/reproduce_manuscript_minimal.m`: minimal manuscript reproduction
+- `matlab/setup_paths.m`: adds the bundled MF12 source tree to the MATLAB path
+- `matlab/irregularWavesMF12/Source/mf12_direct_coefficients.m`: preferred public name for direct coefficient generation
+- `matlab/irregularWavesMF12/Source/mf12_direct_surface.m`: preferred public name for direct reconstruction
+- `matlab/irregularWavesMF12/Source/mf12_spectral_coefficients.m`: preferred public name for spectral coefficient generation
+- `matlab/irregularWavesMF12/Source/mf12_spectral_surface.m`: preferred public name for spectral reconstruction
+- `matlab/examples/run_direct_minimal.m`: smallest direct example
+- `matlab/examples/run_spectral_minimal.m`: smallest spectral example
+- `matlab/tests/smoke_test_minimal.m`: fast release-readiness check
+- `matlab/tests/regression_wavegroup_phi3.m`: more representative directional wave-group comparison
+- `matlab/repro/reproduce_manuscript_minimal.m`: minimal manuscript reproduction
 
 ## Source-level implementation names
 
-Within `irregularWavesMF12/Source`, the clearer source-level names are:
+Within `matlab/irregularWavesMF12/Source`, the clearer source-level names are:
 
 - `mf12_direct_coefficients`
 - `mf12_spectral_coefficients`

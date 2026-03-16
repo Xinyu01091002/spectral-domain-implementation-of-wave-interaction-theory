@@ -1,0 +1,16 @@
+{
+  "case_id": "wavegroup_regression",
+  "runtime": {
+    "repeats": 1,
+    "mean_coefficient_s": 0.0815399,
+    "mean_reconstruction_s": 0.0275233,
+    "mean_total_s": 0.1090632,
+    "best_total_s": 0.1090632
+  },
+  "metadata": {
+    "language": "matlab",
+    "matlab_version": "9.13.0.2698988 (R2022b) Update 10",
+    "fft_backend": "MATLAB ifft2",
+    "implementation": "mf12_spectral_coefficients + mf12_spectral_surface"
+  }
+}
