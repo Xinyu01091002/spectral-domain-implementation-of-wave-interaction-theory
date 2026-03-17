@@ -2,7 +2,9 @@
   "cases": [
     "cross_language_comparison/cases/minimal_small",
     "cross_language_comparison/cases/wavegroup_regression",
-    "cross_language_comparison/cases/benchmark_medium"
+    "cross_language_comparison/cases/benchmark_medium",
+    "cross_language_comparison/cases/benchmark_dense_300",
+    "cross_language_comparison/cases/benchmark_dense_600"
   ],
   "cpp_defaults": {
     "build_dir": "cpp/build",

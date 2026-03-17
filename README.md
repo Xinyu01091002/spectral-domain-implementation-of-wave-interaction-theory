@@ -71,6 +71,8 @@ More specifically:
   - `minimal_small`
   - `wavegroup_regression`
   - `benchmark_medium`
+  - `benchmark_dense_300`
+  - `benchmark_dense_600`
 
 ## Quick Start
 

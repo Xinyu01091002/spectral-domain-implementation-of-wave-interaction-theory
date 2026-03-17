@@ -2,10 +2,10 @@
   "case_id": "minimal_small",
   "runtime": {
     "repeats": 1,
-    "mean_coefficient_s": 0.0567512,
-    "mean_reconstruction_s": 0.3027644,
-    "mean_total_s": 0.3595156,
-    "best_total_s": 0.3595156
+    "mean_coefficient_s": 0.1069095,
+    "mean_reconstruction_s": 0.9026007,
+    "mean_total_s": 1.0095102,
+    "best_total_s": 1.0095102
   },
   "metadata": {
     "language": "matlab",

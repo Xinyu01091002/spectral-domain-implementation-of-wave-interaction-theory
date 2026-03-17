@@ -68,6 +68,15 @@ This checklist tracks the work needed to turn the current research workspace int
 - [ ] Generate one archived reference benchmark summary and figure that report accuracy and speed for all three implementations on the shared cases.
 - [ ] Archive benchmark outputs under `outputs/` and keep one reference log under `docs/benchmarks/`.
 - [ ] Document build and run instructions for the C++ and Python implementations in the README once the first working versions exist.
+- [ ] Evaluate a benchmark-only streaming or chunked `n+m+p` accumulation path for large retained-component cases so C++/Python do not need to materialize the full `npmpp` coefficient arrays in memory:
+  - keep this out of the current correctness/debug path for now
+  - prefer in-memory chunked accumulation into the final spectra rather than writing intermediate coefficient blocks to disk
+  - use it only if larger cases start to hit memory limits or if full-array materialization becomes the next clear bottleneck
+- [ ] Keep a short optimization log in the repo for the C++ port so future work does not repeat dead ends:
+  - record which changes improved runtime and at what problem sizes
+  - record which attempted coefficient optimizations were rejected because they degraded `phi` against MATLAB
+  - record whether a reported benchmark used OpenMP, FFTW, or both
+  - record future candidates such as thread-scaling measurements and streaming `npmpp`
 
 ## Cross-language implementation notes
 

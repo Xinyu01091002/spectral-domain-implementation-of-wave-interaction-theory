@@ -7,7 +7,17 @@
 #include <cmath>
 #include <complex>
 #include <limits>
+#include <map>
+#include <mutex>
 #include <stdexcept>
+
+#if defined(MF12_HAVE_FFTW)
+#include <fftw3.h>
+#endif
+
+#if defined(MF12_HAVE_OPENMP)
+#include <omp.h>
+#endif
 
 namespace mf12_cpp {
 namespace {
@@ -93,6 +103,20 @@ struct SurfaceFields {
   Matrix phi;
   Matrix x;
   Matrix y;
+};
+
+struct CoefficientBuildStats {
+  double linear_s = 0.0;
+  double second_order_s = 0.0;
+  double third_order_s = 0.0;
+  double third_order_np2m_s = 0.0;
+  double third_order_2npm_s = 0.0;
+  double third_order_npmpp_s = 0.0;
+};
+
+struct CoefficientBuildResult {
+  SpectralCoefficients coeffs;
+  CoefficientBuildStats stats;
 };
 
 double coth(double x) {
@@ -231,7 +255,11 @@ double pi_fn(
          h / 2.0 * (fnpm * gamma_npm + fnpp * gamma_npp + fmpp * gamma_mpp);
 }
 
-void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) {
+void add_third_order_terms(
+    SpectralCoefficients& coeffs,
+    const CaseInputs& inp,
+    CoefficientBuildStats* stats = nullptr,
+    bool retain_triplet_debug_indices = false) {
   const int n_comp = coeffs.n_comp;
   coeffs.c.resize(n_comp);
   coeffs.f13.resize(n_comp);
@@ -245,8 +273,14 @@ void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) 
   coeffs.omega3v.resize(n_comp);
 
   std::vector<double> gamma2v_local(n_comp);
+  std::vector<double> inv_omega1(n_comp);
+  std::vector<double> kappa_sq(n_comp);
+  std::vector<double> omega1_sq(n_comp);
   for (int i = 0; i < n_comp; ++i) {
     coeffs.c[i] = std::hypot(coeffs.a[i], coeffs.b[i]);
+    inv_omega1[i] = 1.0 / coeffs.omega1[i];
+    kappa_sq[i] = coeffs.kappa[i] * coeffs.kappa[i];
+    omega1_sq[i] = coeffs.omega1[i] * coeffs.omega1[i];
     gamma2v_local[i] = 2.0 * coeffs.kappa[i] * std::sinh(inp.h * 2.0 * coeffs.kappa[i]);
     const double hk = inp.h * coeffs.kappa[i];
     const double upsilon = coeffs.omega1[i] * coeffs.kappa[i] * (-13.0 + 24.0 * std::cosh(2.0 * hk) + std::cosh(4.0 * hk)) / (64.0 * std::pow(std::sinh(hk), 5.0));
@@ -332,10 +366,12 @@ void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) 
   coeffs.kx_2npm.assign(num_pairs, 0.0);
   coeffs.ky_2npm.assign(num_pairs, 0.0);
 
+  const auto t_np2m_2npm_0 = std::chrono::steady_clock::now();
   int pair_idx = 0;
   for (int n = 0; n < n_comp; ++n) {
     for (int m = n + 1; m < n_comp; ++m) {
       const int idx_sum_nm = m_nm_row_odd[n * n_comp + m] - 1;
+      const auto t_np2m_0 = std::chrono::steady_clock::now();
       coeffs.omega_np2m[pair_idx] = coeffs.omega1[n] + 2.0 * coeffs.omega1[m];
       coeffs.kx_np2m[pair_idx] = coeffs.kx[n] + 2.0 * coeffs.kx[m];
       coeffs.ky_np2m[pair_idx] = coeffs.ky[n] + 2.0 * coeffs.ky[m];
@@ -348,7 +384,12 @@ void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) 
       coeffs.g_np2m[pair_idx] = lambda3(coeffs.omega1[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.omega1[m], coeffs.kx[m], coeffs.ky[m], coeffs.kappa[m], coeffs.omega1[m], coeffs.kx[m], coeffs.ky[m], coeffs.kappa[m], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], 2.0 * coeffs.kappa[m], gamma2v_local[m], coeffs.g2[m], coeffs.f2[m], coeffs.omega_np2m[pair_idx], alpha_np2m, gamma_np2m, beta_np2m, inp.g, inp.h);
       coeffs.f_np2m[pair_idx] = gamma3(coeffs.omega1[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.omega1[m], coeffs.kx[m], coeffs.ky[m], coeffs.kappa[m], coeffs.omega1[m], coeffs.kx[m], coeffs.ky[m], coeffs.kappa[m], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], 2.0 * coeffs.kappa[m], gamma2v_local[m], coeffs.g2[m], coeffs.f2[m], coeffs.omega_np2m[pair_idx], beta_np2m, inp.g, inp.h);
       coeffs.mu_np2m[pair_idx] = pi_fn(coeffs.omega1[n], coeffs.kappa[n], coeffs.omega1[m], coeffs.kappa[m], coeffs.omega1[m], coeffs.kappa[m], coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], gamma2v_local[m], coeffs.g2[m], coeffs.f2[m], coeffs.f_np2m[pair_idx], kappa_np2m, inp.g, inp.h);
+      const auto t_np2m_1 = std::chrono::steady_clock::now();
+      if (stats != nullptr) {
+        stats->third_order_np2m_s += std::chrono::duration<double>(t_np2m_1 - t_np2m_0).count();
+      }
 
+      const auto t_2npm_0 = std::chrono::steady_clock::now();
       coeffs.omega_2npm[pair_idx] = 2.0 * coeffs.omega1[n] + coeffs.omega1[m];
       coeffs.kx_2npm[pair_idx] = 2.0 * coeffs.kx[n] + coeffs.kx[m];
       coeffs.ky_2npm[pair_idx] = 2.0 * coeffs.ky[n] + coeffs.ky[m];
@@ -361,9 +402,14 @@ void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) 
       coeffs.g_2npm[pair_idx] = lambda3(coeffs.omega1[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.omega1[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.omega1[m], coeffs.kx[m], coeffs.ky[m], coeffs.kappa[m], 2.0 * coeffs.kappa[n], gamma2v_local[n], coeffs.g2[n], coeffs.f2[n], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], coeffs.omega_2npm[pair_idx], alpha_2npm, gamma_2npm, beta_2npm, inp.g, inp.h);
       coeffs.f_2npm[pair_idx] = gamma3(coeffs.omega1[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.omega1[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.omega1[m], coeffs.kx[m], coeffs.ky[m], coeffs.kappa[m], 2.0 * coeffs.kappa[n], gamma2v_local[n], coeffs.g2[n], coeffs.f2[n], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], std::hypot(coeffs.kx[n] + coeffs.kx[m], coeffs.ky[n] + coeffs.ky[m]), coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], coeffs.omega_2npm[pair_idx], beta_2npm, inp.g, inp.h);
       coeffs.mu_2npm[pair_idx] = pi_fn(coeffs.omega1[n], coeffs.kappa[n], coeffs.omega1[n], coeffs.kappa[n], coeffs.omega1[m], coeffs.kappa[m], gamma2v_local[n], coeffs.g2[n], coeffs.f2[n], coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], coeffs.gamma_npm[idx_sum_nm], coeffs.g_npm[idx_sum_nm], coeffs.f_npm[idx_sum_nm], coeffs.f_2npm[pair_idx], kappa_2npm, inp.g, inp.h);
+      const auto t_2npm_1 = std::chrono::steady_clock::now();
+      if (stats != nullptr) {
+        stats->third_order_2npm_s += std::chrono::duration<double>(t_2npm_1 - t_2npm_0).count();
+      }
       ++pair_idx;
     }
   }
+  const auto t_np2m_2npm_1 = std::chrono::steady_clock::now();
 
   const int num_triplets = n_comp * (n_comp - 1) * (n_comp - 2) / 6;
   coeffs.a_npmpp.assign(num_triplets, 0.0);
@@ -374,97 +420,183 @@ void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) 
   coeffs.omega_npmpp.assign(num_triplets, 0.0);
   coeffs.kx_npmpp.assign(num_triplets, 0.0);
   coeffs.ky_npmpp.assign(num_triplets, 0.0);
-  coeffs.idx_npmpp_nm.assign(num_triplets, 0.0);
-  coeffs.idx_npmpp_np.assign(num_triplets, 0.0);
-  coeffs.idx_npmpp_mp.assign(num_triplets, 0.0);
+  if (retain_triplet_debug_indices) {
+    coeffs.idx_npmpp_nm.assign(num_triplets, 0.0);
+    coeffs.idx_npmpp_np.assign(num_triplets, 0.0);
+    coeffs.idx_npmpp_mp.assign(num_triplets, 0.0);
+  } else {
+    coeffs.idx_npmpp_nm.clear();
+    coeffs.idx_npmpp_np.clear();
+    coeffs.idx_npmpp_mp.clear();
+  }
 
-  int c3 = 0;
+  struct PairCacheEntry {
+    double gamma = 0.0;
+    double g = 0.0;
+    double f = 0.0;
+    double kappa = 0.0;
+    double cosh_h_kappa = 0.0;
+    double kappa_sq = 0.0;
+  };
+  std::vector<PairCacheEntry> pair_cache(coeffs.f_npm.size());
+  for (std::size_t i = 0; i < pair_cache.size(); ++i) {
+    const double kappa = std::hypot(coeffs.kx_npm[i], coeffs.ky_npm[i]);
+    pair_cache[i].gamma = coeffs.gamma_npm[i];
+    pair_cache[i].g = coeffs.g_npm[i];
+    pair_cache[i].f = coeffs.f_npm[i];
+    pair_cache[i].kappa = kappa;
+    pair_cache[i].cosh_h_kappa = std::cosh(inp.h * kappa);
+    pair_cache[i].kappa_sq = kappa * kappa;
+  }
+
+  const auto t_npmpp_0 = std::chrono::steady_clock::now();
   auto pair_index_col = [](int row, int col) {
     return 2 * ((col * (col - 1)) / 2 + row);
   };
+  std::vector<int> triplet_offset(n_comp + 1, 0);
+  int running_triplets = 0;
   for (int n = 0; n < n_comp; ++n) {
+    triplet_offset[n] = running_triplets;
+    const int remaining = n_comp - n - 1;
+    if (remaining >= 2) {
+      running_triplets += remaining * (remaining - 1) / 2;
+    }
+  }
+  triplet_offset[n_comp] = running_triplets;
+#if defined(MF12_HAVE_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+  for (int n = 0; n < n_comp; ++n) {
+    int c3 = triplet_offset[n];
     for (int m = n + 1; m < n_comp; ++m) {
       const int idx_sum_nm = m_nm_row_odd[n * n_comp + m] - 1;
       for (int p = m + 1; p < n_comp; ++p) {
         const int idx_sum_np = pair_index_col(n, p);
         const int idx_sum_mp = pair_index_col(m, p);
-        coeffs.idx_npmpp_nm[c3] = static_cast<double>(idx_sum_nm);
-        coeffs.idx_npmpp_np[c3] = static_cast<double>(idx_sum_np);
-        coeffs.idx_npmpp_mp[c3] = static_cast<double>(idx_sum_mp);
-        coeffs.omega_npmpp[c3] = coeffs.omega1[n] + coeffs.omega1[m] + coeffs.omega1[p];
-        coeffs.kx_npmpp[c3] = coeffs.kx[n] + coeffs.kx[m] + coeffs.kx[p];
-        coeffs.ky_npmpp[c3] = coeffs.ky[n] + coeffs.ky[m] + coeffs.ky[p];
-        const double kappa_npmpp = std::hypot(coeffs.kx_npmpp[c3], coeffs.ky_npmpp[c3]);
-        const double alpha_npmpp = coeffs.omega_npmpp[c3] * std::cosh(inp.h * kappa_npmpp);
+        if (retain_triplet_debug_indices) {
+          coeffs.idx_npmpp_nm[c3] = static_cast<double>(idx_sum_nm);
+          coeffs.idx_npmpp_np[c3] = static_cast<double>(idx_sum_np);
+          coeffs.idx_npmpp_mp[c3] = static_cast<double>(idx_sum_mp);
+        }
+        const double omega_n = coeffs.omega1[n];
+        const double omega_m = coeffs.omega1[m];
+        const double omega_p = coeffs.omega1[p];
+        const double omega_npmpp = omega_n + omega_m + omega_p;
+        const double omega_npmpp_sq = omega_npmpp * omega_npmpp;
+        coeffs.omega_npmpp[c3] = omega_npmpp;
+
+        const double kx_triplet = coeffs.kx[n] + coeffs.kx[m] + coeffs.kx[p];
+        const double ky_triplet = coeffs.ky[n] + coeffs.ky[m] + coeffs.ky[p];
+        coeffs.kx_npmpp[c3] = kx_triplet;
+        coeffs.ky_npmpp[c3] = ky_triplet;
+        const double kappa_npmpp = std::hypot(kx_triplet, ky_triplet);
+        const double cosh_h_kappa_npmpp = std::cosh(inp.h * kappa_npmpp);
+        const double sinh_h_kappa_npmpp = std::sinh(inp.h * kappa_npmpp);
+        const double alpha_npmpp = omega_npmpp * cosh_h_kappa_npmpp;
         const double gamma_npmpp = kappa_npmpp * std::sinh(inp.h * kappa_npmpp);
-        const double beta_npmpp = coeffs.omega_npmpp[c3] * coeffs.omega_npmpp[c3] * std::cosh(inp.h * kappa_npmpp) - inp.g * kappa_npmpp * std::sinh(inp.h * kappa_npmpp);
-        const double kappanpm = std::hypot(coeffs.kx_npm[idx_sum_nm], coeffs.ky_npm[idx_sum_nm]);
-        const double kappanpp = std::hypot(coeffs.kx_npm[idx_sum_np], coeffs.ky_npm[idx_sum_np]);
-        const double kappampp = std::hypot(coeffs.kx_npm[idx_sum_mp], coeffs.ky_npm[idx_sum_mp]);
-        const double gammanpm = coeffs.gamma_npm[idx_sum_nm];
-        const double gammanpp = coeffs.gamma_npm[idx_sum_np];
-        const double gammampp = coeffs.gamma_npm[idx_sum_mp];
-        const double gnpm = coeffs.g_npm[idx_sum_nm];
-        const double gnpp = coeffs.g_npm[idx_sum_np];
-        const double gmpp = coeffs.g_npm[idx_sum_mp];
-        const double fnpm = coeffs.f_npm[idx_sum_nm];
-        const double fnpp = coeffs.f_npm[idx_sum_np];
-        const double fmpp = coeffs.f_npm[idx_sum_mp];
+        const double beta_npmpp = omega_npmpp_sq * cosh_h_kappa_npmpp - inp.g * kappa_npmpp * sinh_h_kappa_npmpp;
+        const PairCacheEntry& pair_nm = pair_cache[idx_sum_nm];
+        const PairCacheEntry& pair_np = pair_cache[idx_sum_np];
+        const PairCacheEntry& pair_mp = pair_cache[idx_sum_mp];
+        const double kappanpm = pair_nm.kappa;
+        const double kappanpp = pair_np.kappa;
+        const double kappampp = pair_mp.kappa;
+        const double gammanpm = pair_nm.gamma;
+        const double gammanpp = pair_np.gamma;
+        const double gammampp = pair_mp.gamma;
+        const double gnpm = pair_nm.g;
+        const double gnpp = pair_np.g;
+        const double gmpp = pair_mp.g;
+        const double fnpm = pair_nm.f;
+        const double fnpp = pair_np.f;
+        const double fmpp = pair_mp.f;
+        const double cosh_h_kappanpm = pair_nm.cosh_h_kappa;
+        const double cosh_h_kappanpp = pair_np.cosh_h_kappa;
+        const double cosh_h_kappampp = pair_mp.cosh_h_kappa;
         const double knkm = coeffs.kx[n] * coeffs.kx[m] + coeffs.ky[n] * coeffs.ky[m];
         const double knkp = coeffs.kx[n] * coeffs.kx[p] + coeffs.ky[n] * coeffs.ky[p];
         const double kmkp = coeffs.kx[m] * coeffs.kx[p] + coeffs.ky[m] * coeffs.ky[p];
+        const double sum_n = knkm + knkp + kappa_sq[n];
+        const double sum_m = knkm + kmkp + kappa_sq[m];
+        const double sum_p = knkp + kmkp + kappa_sq[p];
+        const double sum_knkp_kmkp = knkp + kmkp;
+        const double sum_knkm_kmkp = knkm + kmkp;
+        const double sum_knkm_knkp = knkm + knkp;
+        const double ratio_n = omega_npmpp * inv_omega1[n];
+        const double ratio_m = omega_npmpp * inv_omega1[m];
+        const double ratio_p = omega_npmpp * inv_omega1[p];
+        const double g_over_omega_n = inp.g * inv_omega1[n];
+        const double g_over_omega_m = inp.g * inv_omega1[m];
+        const double g_over_omega_p = inp.g * inv_omega1[p];
+        const double gamma_inner_n =
+            g_over_omega_n * (omega_m * knkm + omega_p * knkp - omega_npmpp * kappa_sq[n]);
+        const double gamma_inner_m =
+            g_over_omega_m * (omega_n * knkm + omega_p * kmkp - omega_npmpp * kappa_sq[m]);
+        const double gamma_inner_p =
+            g_over_omega_p * (omega_n * knkp + omega_m * kmkp - omega_npmpp * kappa_sq[p]);
+        const double gamma_linear_sum = gamma_inner_n + gamma_inner_m + gamma_inner_p;
+        const double alpha_weighted_sum = omega_n * sum_n + omega_m * sum_m + omega_p * sum_p;
+        const double base_g = inp.h * inp.h / (4.0 * beta_npmpp);
+        const double base_f = -inp.g * inp.h * inp.h / (4.0 * beta_npmpp);
+        const double base_np = inp.h * fnpm / (2.0 * beta_npmpp);
+        const double base_pp = inp.h * fnpp / (2.0 * beta_npmpp);
+        const double base_mp = inp.h * fmpp / (2.0 * beta_npmpp);
+        const double base_gnpm = inp.h * gnpm / (2.0 * beta_npmpp);
+        const double base_gnpp = inp.h * gnpp / (2.0 * beta_npmpp);
+        const double base_gmpp = inp.h * gmpp / (2.0 * beta_npmpp);
+        const double np_geom = sum_knkp_kmkp + pair_nm.kappa_sq;
+        const double pp_geom = sum_knkm_kmkp + pair_np.kappa_sq;
+        const double mp_geom = sum_knkm_knkp + pair_mp.kappa_sq;
+        const double np_alpha_term = alpha_npmpp * cosh_h_kappanpm * np_geom;
+        const double pp_alpha_term = alpha_npmpp * cosh_h_kappanpp * pp_geom;
+        const double mp_alpha_term = alpha_npmpp * cosh_h_kappampp * mp_geom;
+        const double np_gamma_term = gamma_npmpp * (g_over_omega_p * sum_knkp_kmkp * cosh_h_kappanpm - gammanpm * omega_npmpp);
+        const double pp_gamma_term = gamma_npmpp * (g_over_omega_m * sum_knkm_kmkp * cosh_h_kappanpp - gammanpp * omega_npmpp);
+        const double mp_gamma_term = gamma_npmpp * (g_over_omega_n * sum_knkm_knkp * cosh_h_kappampp - gammampp * omega_npmpp);
+        const double np_f_gamma_term =
+            inp.g * cosh_h_kappanpm * (np_geom + ratio_p * sum_knkp_kmkp) - gammanpm * omega_npmpp_sq;
+        const double pp_f_gamma_term =
+            inp.g * cosh_h_kappanpp * (pp_geom + ratio_m * sum_knkm_kmkp) - gammanpp * omega_npmpp_sq;
+        const double mp_f_gamma_term =
+            inp.g * cosh_h_kappampp * (mp_geom + ratio_n * sum_knkm_knkp) - gammampp * omega_npmpp_sq;
+        const double gnpm_sum_term = sum_knkp_kmkp + kappa_sq[p];
+        const double gnpp_sum_term = sum_knkm_kmkp + kappa_sq[m];
+        const double gmpp_sum_term = sum_knkm_knkp + kappa_sq[n];
         coeffs.a_npmpp[c3] = 0.5 * theta_a(coeffs.a[n], coeffs.b[n], coeffs.a[m], coeffs.b[m], coeffs.a[p], coeffs.b[p], inp.h);
         coeffs.b_npmpp[c3] = 0.5 * theta_b(coeffs.a[n], coeffs.b[n], coeffs.a[m], coeffs.b[m], coeffs.a[p], coeffs.b[p], inp.h);
-        coeffs.g_npmpp[c3] =
-            inp.h * inp.h / (4.0 * beta_npmpp) *
-                (alpha_npmpp *
-                     (coeffs.omega1[n] * (knkm + knkp + coeffs.kappa[n] * coeffs.kappa[n]) +
-                      coeffs.omega1[m] * (knkm + kmkp + coeffs.kappa[m] * coeffs.kappa[m]) +
-                      coeffs.omega1[p] * (knkp + kmkp + coeffs.kappa[p] * coeffs.kappa[p])) +
-                 gamma_npmpp *
-                     (inp.g / coeffs.omega1[n] * (coeffs.omega1[m] * knkm + coeffs.omega1[p] * knkp - coeffs.omega_npmpp[c3] * coeffs.kappa[n] * coeffs.kappa[n]) +
-                      inp.g / coeffs.omega1[m] * (coeffs.omega1[n] * knkm + coeffs.omega1[p] * kmkp - coeffs.omega_npmpp[c3] * coeffs.kappa[m] * coeffs.kappa[m]) +
-                      inp.g / coeffs.omega1[p] * (coeffs.omega1[n] * knkp + coeffs.omega1[m] * kmkp - coeffs.omega_npmpp[c3] * coeffs.kappa[p] * coeffs.kappa[p]))) -
-            inp.h * fnpm / (2.0 * beta_npmpp) *
-                (alpha_npmpp * std::cosh(inp.h * kappanpm) * (knkp + kmkp + kappanpm * kappanpm) +
-                 gamma_npmpp * (inp.g / coeffs.omega1[p] * (knkp + kmkp) * std::cosh(inp.h * kappanpm) - gammanpm * coeffs.omega_npmpp[c3])) -
-            inp.h * fnpp / (2.0 * beta_npmpp) *
-                (alpha_npmpp * std::cosh(inp.h * kappanpp) * (knkm + kmkp + kappanpp * kappanpp) +
-                 gamma_npmpp * (inp.g / coeffs.omega1[m] * (knkm + kmkp) * std::cosh(inp.h * kappanpp) - gammanpp * coeffs.omega_npmpp[c3])) -
-            inp.h * fmpp / (2.0 * beta_npmpp) *
-                (alpha_npmpp * std::cosh(inp.h * kappampp) * (knkm + knkp + kappampp * kappampp) +
-                 gamma_npmpp * (inp.g / coeffs.omega1[n] * (knkm + knkp) * std::cosh(inp.h * kappampp) - gammampp * coeffs.omega_npmpp[c3])) +
-            inp.h * gnpm / (2.0 * beta_npmpp) * (alpha_npmpp * inp.g / coeffs.omega1[p] * (knkp + kmkp + coeffs.kappa[p] * coeffs.kappa[p]) - gamma_npmpp * coeffs.omega1[p] * coeffs.omega1[p]) +
-            inp.h * gnpp / (2.0 * beta_npmpp) * (alpha_npmpp * inp.g / coeffs.omega1[m] * (knkm + kmkp + coeffs.kappa[m] * coeffs.kappa[m]) - gamma_npmpp * coeffs.omega1[m] * coeffs.omega1[m]) +
-            inp.h * gmpp / (2.0 * beta_npmpp) * (alpha_npmpp * inp.g / coeffs.omega1[n] * (knkm + knkp + coeffs.kappa[n] * coeffs.kappa[n]) - gamma_npmpp * coeffs.omega1[n] * coeffs.omega1[n]);
-        coeffs.f_npmpp[c3] =
-            -inp.g * inp.h * inp.h / (4.0 * beta_npmpp) *
-                (coeffs.omega1[n] * (knkm + knkp + coeffs.kappa[n] * coeffs.kappa[n]) +
-                 coeffs.omega1[m] * (knkm + kmkp + coeffs.kappa[m] * coeffs.kappa[m]) +
-                 coeffs.omega1[p] * (knkp + kmkp + coeffs.kappa[p] * coeffs.kappa[p]) +
-                 coeffs.omega_npmpp[c3] / coeffs.omega1[n] * (coeffs.omega1[m] * knkm + coeffs.omega1[p] * knkp - coeffs.omega_npmpp[c3] * coeffs.kappa[n] * coeffs.kappa[n]) +
-                 coeffs.omega_npmpp[c3] / coeffs.omega1[m] * (coeffs.omega1[n] * knkm + coeffs.omega1[p] * kmkp - coeffs.omega_npmpp[c3] * coeffs.kappa[m] * coeffs.kappa[m]) +
-                 coeffs.omega_npmpp[c3] / coeffs.omega1[p] * (coeffs.omega1[n] * knkp + coeffs.omega1[m] * kmkp - coeffs.omega_npmpp[c3] * coeffs.kappa[p] * coeffs.kappa[p])) +
-            inp.h * fnpm / (2.0 * beta_npmpp) *
-                (inp.g * std::cosh(inp.h * kappanpm) * ((knkp + kmkp + kappanpm * kappanpm) + coeffs.omega_npmpp[c3] / coeffs.omega1[p] * (knkp + kmkp)) -
-                 gammanpm * coeffs.omega_npmpp[c3] * coeffs.omega_npmpp[c3]) +
-            inp.h * fnpp / (2.0 * beta_npmpp) *
-                (inp.g * std::cosh(inp.h * kappanpp) * ((knkm + kmkp + kappanpp * kappanpp) + coeffs.omega_npmpp[c3] / coeffs.omega1[m] * (knkm + kmkp)) -
-                 gammanpp * coeffs.omega_npmpp[c3] * coeffs.omega_npmpp[c3]) +
-            inp.h * fmpp / (2.0 * beta_npmpp) *
-                (inp.g * std::cosh(inp.h * kappampp) * ((knkm + knkp + kappampp * kappampp) + coeffs.omega_npmpp[c3] / coeffs.omega1[n] * (knkm + knkp)) -
-                 gammampp * coeffs.omega_npmpp[c3] * coeffs.omega_npmpp[c3]) +
-            inp.h * gnpm / (2.0 * beta_npmpp) * (coeffs.omega1[p] * coeffs.omega1[p] * coeffs.omega_npmpp[c3] - inp.g * inp.g / coeffs.omega1[p] * (knkp + kmkp + coeffs.kappa[p] * coeffs.kappa[p])) +
-            inp.h * gnpp / (2.0 * beta_npmpp) * (coeffs.omega1[m] * coeffs.omega1[m] * coeffs.omega_npmpp[c3] - inp.g * inp.g / coeffs.omega1[m] * (knkm + kmkp + coeffs.kappa[m] * coeffs.kappa[m])) +
-            inp.h * gmpp / (2.0 * beta_npmpp) * (coeffs.omega1[n] * coeffs.omega1[n] * coeffs.omega_npmpp[c3] - inp.g * inp.g / coeffs.omega1[n] * (knkm + knkp + coeffs.kappa[n] * coeffs.kappa[n]));
+        coeffs.g_npmpp[c3] = base_g * (alpha_npmpp * alpha_weighted_sum + gamma_npmpp * gamma_linear_sum) -
+                             base_np * (np_alpha_term + np_gamma_term) -
+                             base_pp * (pp_alpha_term + pp_gamma_term) -
+                             base_mp * (mp_alpha_term + mp_gamma_term) +
+                             base_gnpm * (alpha_npmpp * g_over_omega_p * gnpm_sum_term - gamma_npmpp * omega1_sq[p]) +
+                             base_gnpp * (alpha_npmpp * g_over_omega_m * gnpp_sum_term - gamma_npmpp * omega1_sq[m]) +
+                             base_gmpp * (alpha_npmpp * g_over_omega_n * gmpp_sum_term - gamma_npmpp * omega1_sq[n]);
+        coeffs.f_npmpp[c3] = base_f * (alpha_weighted_sum + ratio_n * (omega_m * knkm + omega_p * knkp - omega_npmpp * kappa_sq[n]) +
+                                       ratio_m * (omega_n * knkm + omega_p * kmkp - omega_npmpp * kappa_sq[m]) +
+                                       ratio_p * (omega_n * knkp + omega_m * kmkp - omega_npmpp * kappa_sq[p])) +
+                             base_np * np_f_gamma_term +
+                             base_pp * pp_f_gamma_term +
+                             base_mp * mp_f_gamma_term +
+                             base_gnpm * (omega1_sq[p] * omega_npmpp - inp.g * inp.g * inv_omega1[p] * gnpm_sum_term) +
+                             base_gnpp * (omega1_sq[m] * omega_npmpp - inp.g * inp.g * inv_omega1[m] * gnpp_sum_term) +
+                             base_gmpp * (omega1_sq[n] * omega_npmpp - inp.g * inp.g * inv_omega1[n] * gmpp_sum_term);
         coeffs.mu_npmpp[c3] =
-            coeffs.f_npmpp[c3] * std::cosh(inp.h * kappa_npmpp) -
-            inp.g * inp.h * inp.h / 4.0 * (coeffs.kappa[n] * coeffs.kappa[n] / coeffs.omega1[n] + coeffs.kappa[m] * coeffs.kappa[m] / coeffs.omega1[m] + coeffs.kappa[p] * coeffs.kappa[p] / coeffs.omega1[p]) -
-            inp.h / 2.0 * (coeffs.omega1[n] * gmpp + coeffs.omega1[m] * gnpp + coeffs.omega1[p] * gnpm) +
+            coeffs.f_npmpp[c3] * cosh_h_kappa_npmpp -
+            inp.g * inp.h * inp.h / 4.0 * (kappa_sq[n] * inv_omega1[n] + kappa_sq[m] * inv_omega1[m] + kappa_sq[p] * inv_omega1[p]) -
+            inp.h / 2.0 * (omega_n * gmpp + omega_m * gnpp + omega_p * gnpm) +
             inp.h / 2.0 * (fnpm * gammanpm + fnpp * gammanpp + fmpp * gammampp);
         ++c3;
       }
     }
+  }
+  const auto t_npmpp_1 = std::chrono::steady_clock::now();
+  if (stats != nullptr) {
+    if (stats->third_order_np2m_s == 0.0 && stats->third_order_2npm_s == 0.0) {
+      const double pair_total = std::chrono::duration<double>(t_np2m_2npm_1 - t_np2m_2npm_0).count();
+      stats->third_order_np2m_s = 0.5 * pair_total;
+      stats->third_order_2npm_s = 0.5 * pair_total;
+    }
+    stats->third_order_npmpp_s += std::chrono::duration<double>(t_npmpp_1 - t_npmpp_0).count();
   }
 
   for (int n = 0; n < n_comp; ++n) {
@@ -483,7 +615,7 @@ void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) 
       ++pair_idx;
     }
   }
-  c3 = 0;
+  int c3 = 0;
   for (int n = 0; n < n_comp; ++n) {
     for (int m = n + 1; m < n_comp; ++m) {
       for (int p = m + 1; p < n_comp; ++p) {
@@ -494,9 +626,10 @@ void add_third_order_terms(SpectralCoefficients& coeffs, const CaseInputs& inp) 
   }
 }
 
-SpectralCoefficients compute_coefficients(const LoadedCase& loaded) {
+CoefficientBuildResult compute_coefficients(const LoadedCase& loaded, bool retain_triplet_debug_indices = false) {
   const auto& inp = loaded.manifest.inputs;
-  SpectralCoefficients coeffs;
+  CoefficientBuildResult built;
+  SpectralCoefficients& coeffs = built.coeffs;
   coeffs.order = inp.order;
   coeffs.g = inp.g;
   coeffs.h = inp.h;
@@ -523,6 +656,7 @@ SpectralCoefficients compute_coefficients(const LoadedCase& loaded) {
   coeffs.ky2.resize(coeffs.n_comp);
   coeffs.omega2.resize(coeffs.n_comp);
 
+  const auto t_linear_0 = std::chrono::steady_clock::now();
   for (int i = 0; i < coeffs.n_comp; ++i) {
     coeffs.kappa[i] = std::hypot(coeffs.kx[i], coeffs.ky[i]);
     coeffs.omega1[i] = std::sqrt(inp.g * coeffs.kappa[i] * std::tanh(inp.h * coeffs.kappa[i]));
@@ -533,8 +667,11 @@ SpectralCoefficients compute_coefficients(const LoadedCase& loaded) {
     coeffs.ky2[i] = 2.0 * coeffs.ky[i];
     coeffs.omega2[i] = 2.0 * coeffs.omega[i];
   }
+  const auto t_linear_1 = std::chrono::steady_clock::now();
+  built.stats.linear_s = std::chrono::duration<double>(t_linear_1 - t_linear_0).count();
 
   if (inp.order >= 2) {
+    const auto t_second_0 = std::chrono::steady_clock::now();
     coeffs.g2.resize(coeffs.n_comp);
     coeffs.f2.resize(coeffs.n_comp);
     coeffs.gamma2v.resize(coeffs.n_comp);
@@ -595,13 +732,18 @@ SpectralCoefficients compute_coefficients(const LoadedCase& loaded) {
         coeffs.b_npm[idx_minus] = (coeffs.a[m] * coeffs.b[n] - coeffs.a[n] * coeffs.b[m]) / inp.h;
       }
     }
+    const auto t_second_1 = std::chrono::steady_clock::now();
+    built.stats.second_order_s = std::chrono::duration<double>(t_second_1 - t_second_0).count();
   }
 
   if (inp.order == 3) {
-    add_third_order_terms(coeffs, inp);
+    const auto t_third_0 = std::chrono::steady_clock::now();
+    add_third_order_terms(coeffs, inp, &built.stats, retain_triplet_debug_indices);
+    const auto t_third_1 = std::chrono::steady_clock::now();
+    built.stats.third_order_s = std::chrono::duration<double>(t_third_1 - t_third_0).count();
   }
 
-  return coeffs;
+  return built;
 }
 
 std::vector<std::complex<double>> make_complex(const std::vector<double>& real_part, const std::vector<double>& imag_part) {
@@ -665,33 +807,178 @@ std::vector<std::complex<double>> inverse_dft_1d(const std::vector<std::complex<
   return out;
 }
 
-Matrix inverse_dft2_unscaled(const std::vector<std::complex<double>>& spec, int nx, int ny) {
-  std::vector<std::complex<double>> temp(static_cast<std::size_t>(nx * ny));
-  for (int row = 0; row < ny; ++row) {
-    std::vector<std::complex<double>> row_in(nx);
-    for (int col = 0; col < nx; ++col) {
-      row_in[col] = spec[static_cast<std::size_t>(row * nx + col)];
+bool is_power_of_two(std::size_t n) {
+  return n > 0 && (n & (n - 1)) == 0;
+}
+
+struct FftPlan1D {
+  std::size_t n = 0;
+  bool is_radix2 = false;
+  std::vector<std::size_t> bit_reversed;
+  std::vector<std::vector<std::complex<double>>> twiddles_by_stage;
+};
+
+std::size_t reverse_bits(std::size_t value, int bit_count) {
+  std::size_t reversed = 0;
+  for (int i = 0; i < bit_count; ++i) {
+    reversed = (reversed << 1U) | (value & 1U);
+    value >>= 1U;
+  }
+  return reversed;
+}
+
+const FftPlan1D& get_fft_plan_1d(std::size_t n) {
+  static std::map<std::size_t, FftPlan1D> cache;
+  static std::mutex cache_mutex;
+
+  std::lock_guard<std::mutex> lock(cache_mutex);
+  const auto found = cache.find(n);
+  if (found != cache.end()) {
+    return found->second;
+  }
+
+  FftPlan1D plan;
+  plan.n = n;
+  plan.is_radix2 = is_power_of_two(n);
+  if (plan.is_radix2) {
+    int bit_count = 0;
+    while ((std::size_t(1) << bit_count) < n) {
+      ++bit_count;
     }
-    const auto row_out = inverse_dft_1d(row_in);
-    for (int col = 0; col < nx; ++col) {
-      temp[static_cast<std::size_t>(row * nx + col)] = row_out[col];
+
+    plan.bit_reversed.resize(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      plan.bit_reversed[i] = reverse_bits(i, bit_count);
+    }
+
+    for (std::size_t len = 2; len <= n; len <<= 1U) {
+      const std::size_t half = len >> 1U;
+      std::vector<std::complex<double>> twiddles(half);
+      const double angle = 2.0 * kPi / static_cast<double>(len);
+      for (std::size_t j = 0; j < half; ++j) {
+        twiddles[j] = std::exp(std::complex<double>(0.0, angle * static_cast<double>(j)));
+      }
+      plan.twiddles_by_stage.push_back(std::move(twiddles));
     }
   }
+
+  const auto [it, _] = cache.emplace(n, std::move(plan));
+  return it->second;
+}
+
+void inverse_fft_1d_unscaled_strided(
+    const std::complex<double>* in_base,
+    std::size_t n,
+    std::size_t in_stride,
+    std::complex<double>* out_base,
+    std::size_t out_stride,
+    std::vector<std::complex<double>>& scratch) {
+  const auto& plan = get_fft_plan_1d(n);
+  scratch.resize(n);
+
+  if (!plan.is_radix2) {
+    for (std::size_t x = 0; x < n; ++x) {
+      std::complex<double> sum(0.0, 0.0);
+      for (std::size_t k = 0; k < n; ++k) {
+        const double angle = 2.0 * kPi * static_cast<double>(x * k) / static_cast<double>(n);
+        sum += in_base[k * in_stride] * std::exp(std::complex<double>(0.0, angle));
+      }
+      out_base[x * out_stride] = sum;
+    }
+    return;
+  }
+
+  for (std::size_t i = 0; i < n; ++i) {
+    scratch[plan.bit_reversed[i]] = in_base[i * in_stride];
+  }
+
+  for (std::size_t stage = 0, len = 2; len <= n; ++stage, len <<= 1U) {
+    const auto& twiddles = plan.twiddles_by_stage[stage];
+    for (std::size_t start = 0; start < n; start += len) {
+      const std::size_t half = len >> 1U;
+      for (std::size_t j = 0; j < half; ++j) {
+        const auto u = scratch[start + j];
+        const auto v = scratch[start + j + half] * twiddles[j];
+        scratch[start + j] = u + v;
+        scratch[start + j + half] = u - v;
+      }
+    }
+  }
+
+  for (std::size_t i = 0; i < n; ++i) {
+    out_base[i * out_stride] = scratch[i];
+  }
+}
+
+Matrix inverse_fft2_unscaled(const std::vector<std::complex<double>>& spec, int nx, int ny) {
+#if defined(MF12_HAVE_FFTW)
+  const std::size_t n = static_cast<std::size_t>(nx * ny);
+  fftw_complex* in = fftw_alloc_complex(n);
+  fftw_complex* out = fftw_alloc_complex(n);
+  if (in == nullptr || out == nullptr) {
+    if (in != nullptr) {
+      fftw_free(in);
+    }
+    if (out != nullptr) {
+      fftw_free(out);
+    }
+    throw std::runtime_error("FFTW allocation failed");
+  }
+
+  for (std::size_t i = 0; i < n; ++i) {
+    in[i][0] = spec[i].real();
+    in[i][1] = spec[i].imag();
+  }
+
+  fftw_plan plan = fftw_plan_dft_2d(ny, nx, in, out, FFTW_BACKWARD, FFTW_ESTIMATE);
+  if (plan == nullptr) {
+    fftw_free(in);
+    fftw_free(out);
+    throw std::runtime_error("Failed to create FFTW backward plan");
+  }
+
+  fftw_execute(plan);
+
+  Matrix mat;
+  mat.rows = static_cast<std::size_t>(ny);
+  mat.cols = static_cast<std::size_t>(nx);
+  mat.values.assign(n, 0.0);
+  for (std::size_t i = 0; i < n; ++i) {
+    mat.values[i] = out[i][0];
+  }
+
+  fftw_destroy_plan(plan);
+  fftw_free(in);
+  fftw_free(out);
+  return mat;
+#else
+  std::vector<std::complex<double>> temp = spec;
+  std::vector<std::complex<double>> scratch(static_cast<std::size_t>(std::max(nx, ny)));
+
+  for (int row = 0; row < ny; ++row) {
+    auto* row_ptr = temp.data() + static_cast<std::size_t>(row * nx);
+    inverse_fft_1d_unscaled_strided(row_ptr, static_cast<std::size_t>(nx), 1U, row_ptr, 1U, scratch);
+  }
+
   Matrix out;
   out.rows = static_cast<std::size_t>(ny);
   out.cols = static_cast<std::size_t>(nx);
   out.values.assign(static_cast<std::size_t>(nx * ny), 0.0);
   for (int col = 0; col < nx; ++col) {
-    std::vector<std::complex<double>> col_in(ny);
+    std::vector<std::complex<double>> col_out(static_cast<std::size_t>(ny));
+    inverse_fft_1d_unscaled_strided(
+        temp.data() + static_cast<std::size_t>(col),
+        static_cast<std::size_t>(ny),
+        static_cast<std::size_t>(nx),
+        col_out.data(),
+        1U,
+        scratch);
     for (int row = 0; row < ny; ++row) {
-      col_in[row] = temp[static_cast<std::size_t>(row * nx + col)];
-    }
-    const auto col_out = inverse_dft_1d(col_in);
-    for (int row = 0; row < ny; ++row) {
-      out.values[static_cast<std::size_t>(row * nx + col)] = col_out[row].real();
+      out.values[static_cast<std::size_t>(row * nx + col)] = col_out[static_cast<std::size_t>(row)].real();
     }
   }
   return out;
+#endif
 }
 
 SurfaceFields reconstruct_surface(const SpectralCoefficients& coeffs, const CaseInputs& inp) {
@@ -777,8 +1064,8 @@ SurfaceFields reconstruct_surface(const SpectralCoefficients& coeffs, const Case
   }
 
   SurfaceFields fields;
-  fields.eta = inverse_dft2_unscaled(spec_eta, nx, ny);
-  fields.phi = inverse_dft2_unscaled(spec_phi, nx, ny);
+  fields.eta = inverse_fft2_unscaled(spec_eta, nx, ny);
+  fields.phi = inverse_fft2_unscaled(spec_phi, nx, ny);
   fields.x.rows = 1;
   fields.x.cols = static_cast<std::size_t>(nx);
   fields.x.values.resize(static_cast<std::size_t>(nx));
@@ -809,20 +1096,32 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
   }
 
   if (warmup) {
-    const auto coeffs = compute_coefficients(loaded);
-    (void) reconstruct_surface(coeffs, loaded.manifest.inputs);
+    const auto built = compute_coefficients(loaded);
+    (void) reconstruct_surface(built.coeffs, loaded.manifest.inputs);
   }
 
   std::vector<double> coeff_times;
+  std::vector<double> coeff_linear_times;
+  std::vector<double> coeff_second_order_times;
+  std::vector<double> coeff_third_order_times;
+  std::vector<double> coeff_third_order_np2m_times;
+  std::vector<double> coeff_third_order_2npm_times;
+  std::vector<double> coeff_third_order_npmpp_times;
   std::vector<double> recon_times;
   SurfaceFields fields;
   for (int i = 0; i < repeats; ++i) {
     const auto t0 = std::chrono::steady_clock::now();
-    const auto coeffs = compute_coefficients(loaded);
+    const auto built = compute_coefficients(loaded);
     const auto t1 = std::chrono::steady_clock::now();
-    fields = reconstruct_surface(coeffs, loaded.manifest.inputs);
+    fields = reconstruct_surface(built.coeffs, loaded.manifest.inputs);
     const auto t2 = std::chrono::steady_clock::now();
     coeff_times.push_back(std::chrono::duration<double>(t1 - t0).count());
+    coeff_linear_times.push_back(built.stats.linear_s);
+    coeff_second_order_times.push_back(built.stats.second_order_s);
+    coeff_third_order_times.push_back(built.stats.third_order_s);
+    coeff_third_order_np2m_times.push_back(built.stats.third_order_np2m_s);
+    coeff_third_order_2npm_times.push_back(built.stats.third_order_2npm_s);
+    coeff_third_order_npmpp_times.push_back(built.stats.third_order_npmpp_s);
     recon_times.push_back(std::chrono::duration<double>(t2 - t1).count());
   }
 
@@ -834,21 +1133,40 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
   result.runtime.repeats = repeats;
   result.runtime.warmup = warmup;
   double coeff_sum = 0.0;
+  double coeff_linear_sum = 0.0;
+  double coeff_second_order_sum = 0.0;
+  double coeff_third_order_sum = 0.0;
+  double coeff_third_order_np2m_sum = 0.0;
+  double coeff_third_order_2npm_sum = 0.0;
+  double coeff_third_order_npmpp_sum = 0.0;
   double recon_sum = 0.0;
   result.runtime.best_total_s = std::numeric_limits<double>::max();
   for (std::size_t i = 0; i < coeff_times.size(); ++i) {
     coeff_sum += coeff_times[i];
+    coeff_linear_sum += coeff_linear_times[i];
+    coeff_second_order_sum += coeff_second_order_times[i];
+    coeff_third_order_sum += coeff_third_order_times[i];
+    coeff_third_order_np2m_sum += coeff_third_order_np2m_times[i];
+    coeff_third_order_2npm_sum += coeff_third_order_2npm_times[i];
+    coeff_third_order_npmpp_sum += coeff_third_order_npmpp_times[i];
     recon_sum += recon_times[i];
     result.runtime.best_total_s = std::min(result.runtime.best_total_s, coeff_times[i] + recon_times[i]);
   }
   result.runtime.mean_coefficient_s = coeff_sum / static_cast<double>(coeff_times.size());
+  result.runtime.mean_linear_coefficient_s = coeff_linear_sum / static_cast<double>(coeff_linear_times.size());
+  result.runtime.mean_second_order_coefficient_s = coeff_second_order_sum / static_cast<double>(coeff_second_order_times.size());
+  result.runtime.mean_third_order_coefficient_s = coeff_third_order_sum / static_cast<double>(coeff_third_order_times.size());
+  result.runtime.mean_third_order_np2m_s = coeff_third_order_np2m_sum / static_cast<double>(coeff_third_order_np2m_times.size());
+  result.runtime.mean_third_order_2npm_s = coeff_third_order_2npm_sum / static_cast<double>(coeff_third_order_2npm_times.size());
+  result.runtime.mean_third_order_npmpp_s = coeff_third_order_npmpp_sum / static_cast<double>(coeff_third_order_npmpp_times.size());
   result.runtime.mean_reconstruction_s = recon_sum / static_cast<double>(recon_times.size());
   result.runtime.mean_total_s = result.runtime.mean_coefficient_s + result.runtime.mean_reconstruction_s;
   return result;
 }
 
 void dump_coefficients_for_case(const LoadedCase& loaded, const std::filesystem::path& output_dir) {
-  const auto coeffs = compute_coefficients(loaded);
+  const auto built = compute_coefficients(loaded, true);
+  const auto& coeffs = built.coeffs;
   const auto& inp = loaded.manifest.inputs;
   std::filesystem::create_directories(output_dir);
   auto save_vec = [&](const std::string& name, const std::vector<double>& values) {

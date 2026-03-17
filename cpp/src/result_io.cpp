@@ -38,11 +38,22 @@ void save_result_bundle(const std::filesystem::path& output_dir, const LoadedCas
     throw std::runtime_error("Failed to write result.json");
   }
   out << std::setprecision(17);
+#if defined(MF12_HAVE_FFTW)
+  const char* fft_backend = "FFTW3 backward 2D complex DFT";
+#else
+  const char* fft_backend = "in-house radix-2 inverse FFT (fallback direct inverse DFT)";
+#endif
   out << "{\n"
       << "  \"case_id\": \"" << loaded.manifest.case_id << "\",\n"
       << "  \"runtime\": {\n"
       << "    \"repeats\": " << result.runtime.repeats << ",\n"
       << "    \"mean_coefficient_s\": " << result.runtime.mean_coefficient_s << ",\n"
+      << "    \"mean_linear_coefficient_s\": " << result.runtime.mean_linear_coefficient_s << ",\n"
+      << "    \"mean_second_order_coefficient_s\": " << result.runtime.mean_second_order_coefficient_s << ",\n"
+      << "    \"mean_third_order_coefficient_s\": " << result.runtime.mean_third_order_coefficient_s << ",\n"
+      << "    \"mean_third_order_np2m_s\": " << result.runtime.mean_third_order_np2m_s << ",\n"
+      << "    \"mean_third_order_2npm_s\": " << result.runtime.mean_third_order_2npm_s << ",\n"
+      << "    \"mean_third_order_npmpp_s\": " << result.runtime.mean_third_order_npmpp_s << ",\n"
       << "    \"mean_reconstruction_s\": " << result.runtime.mean_reconstruction_s << ",\n"
       << "    \"mean_total_s\": " << result.runtime.mean_total_s << ",\n"
       << "    \"best_total_s\": " << result.runtime.best_total_s << "\n"
@@ -50,7 +61,7 @@ void save_result_bundle(const std::filesystem::path& output_dir, const LoadedCas
       << "  \"metadata\": {\n"
       << "    \"language\": \"cpp\",\n"
       << "    \"implementation\": \"mf12_cpp spectral-only order<=3 (third-order WIP)\",\n"
-      << "    \"fft_backend\": \"built-in separable inverse DFT\"\n"
+      << "    \"fft_backend\": \"" << fft_backend << "\"\n"
       << "  },\n"
       << "  \"comparison\": {\n";
   bool first = true;

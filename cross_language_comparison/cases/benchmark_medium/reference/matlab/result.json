@@ -2,10 +2,10 @@
   "case_id": "benchmark_medium",
   "runtime": {
     "repeats": 3,
-    "mean_coefficient_s": 0.016457033333333333,
-    "mean_reconstruction_s": 0.014582,
-    "mean_total_s": 0.031039033333333337,
-    "best_total_s": 0.0179575
+    "mean_coefficient_s": 0.020078833333333334,
+    "mean_reconstruction_s": 0.0119759,
+    "mean_total_s": 0.032054733333333335,
+    "best_total_s": 0.02175
   },
   "metadata": {
     "language": "matlab",

@@ -1,0 +1,33 @@
+{
+  "case_id": "benchmark_dense_600",
+  "description": "Dense deterministic benchmark case for cross-language speed sweeps with up to 600 retained components.",
+  "purpose": "benchmark",
+  "inputs": {
+    "order": 3,
+    "g": 9.81,
+    "h": 150,
+    "Ux": 0,
+    "Uy": 0,
+    "Lx": 3000,
+    "Ly": 3000,
+    "Nx": 64,
+    "Ny": 64,
+    "t": 0,
+    "subharmonic_mode": "skip"
+  },
+  "arrays": {
+    "a": "inputs\\a.csv",
+    "b": "inputs\\b.csv",
+    "kx": "inputs\\kx.csv",
+    "ky": "inputs\\ky.csv"
+  },
+  "reference": {},
+  "tolerances": {
+    "eta_max_abs_err": 1E-6,
+    "phi_max_abs_err": 1E-6,
+    "eta_rms_err": 1E-7,
+    "phi_rms_err": 1E-7,
+    "eta_relative_l2_err": 1E-6,
+    "phi_relative_l2_err": 1E-6
+  }
+}

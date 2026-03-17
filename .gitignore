@@ -17,6 +17,7 @@ desktop.ini
 .vscode/
 .idea/
 cpp/build/
+cpp/build*/
 
 # Generated logs and outputs from this project
 compare_log.txt

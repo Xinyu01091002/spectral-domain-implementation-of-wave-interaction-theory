@@ -17,6 +17,7 @@ void print_usage() {
       << "  inspect <case_dir>   Load a shared case and print a summary\n"
       << "  validate <case_dir>  Validate that a shared case matches the expected layout\n"
       << "  verify <case_dir> [output_dir] [order]  Run the C++ spectral path and compare to MATLAB reference\n"
+      << "  benchmark <case_dir> [repeats] [warmup]  Time the C++ spectral path without requiring MATLAB references\n"
       << "  dump-coeffs <case_dir> <output_dir> [order]  Dump coefficient arrays for debugging\n";
 }
 
@@ -77,6 +78,40 @@ int run_verify(const std::filesystem::path& case_dir, const std::filesystem::pat
   return pass ? 0 : 1;
 }
 
+int run_benchmark(const std::filesystem::path& case_dir, int repeats, bool warmup) {
+  const auto loaded = mf12_cpp::load_case(case_dir);
+  const auto result = mf12_cpp::run_case(loaded, repeats, warmup);
+  const auto n_components = loaded.arrays.at("a").values.size();
+  std::cout << "{\n"
+            << "  \"case_id\": \"" << loaded.manifest.case_id << "\",\n"
+            << "  \"order\": " << loaded.manifest.inputs.order << ",\n"
+            << "  \"component_count\": " << n_components << ",\n"
+            << "  \"domain\": {\n"
+            << "    \"Lx\": " << loaded.manifest.inputs.Lx << ",\n"
+            << "    \"Ly\": " << loaded.manifest.inputs.Ly << "\n"
+            << "  },\n"
+            << "  \"grid\": {\n"
+            << "    \"Nx\": " << loaded.manifest.inputs.Nx << ",\n"
+            << "    \"Ny\": " << loaded.manifest.inputs.Ny << "\n"
+            << "  },\n"
+            << "  \"runtime\": {\n"
+            << "    \"repeats\": " << result.runtime.repeats << ",\n"
+            << "    \"warmup\": " << (result.runtime.warmup ? "true" : "false") << ",\n"
+            << "    \"mean_coefficient_s\": " << std::setprecision(17) << result.runtime.mean_coefficient_s << ",\n"
+            << "    \"mean_linear_coefficient_s\": " << std::setprecision(17) << result.runtime.mean_linear_coefficient_s << ",\n"
+            << "    \"mean_second_order_coefficient_s\": " << std::setprecision(17) << result.runtime.mean_second_order_coefficient_s << ",\n"
+            << "    \"mean_third_order_coefficient_s\": " << std::setprecision(17) << result.runtime.mean_third_order_coefficient_s << ",\n"
+            << "    \"mean_third_order_np2m_s\": " << std::setprecision(17) << result.runtime.mean_third_order_np2m_s << ",\n"
+            << "    \"mean_third_order_2npm_s\": " << std::setprecision(17) << result.runtime.mean_third_order_2npm_s << ",\n"
+            << "    \"mean_third_order_npmpp_s\": " << std::setprecision(17) << result.runtime.mean_third_order_npmpp_s << ",\n"
+            << "    \"mean_reconstruction_s\": " << std::setprecision(17) << result.runtime.mean_reconstruction_s << ",\n"
+            << "    \"mean_total_s\": " << std::setprecision(17) << result.runtime.mean_total_s << ",\n"
+            << "    \"best_total_s\": " << std::setprecision(17) << result.runtime.best_total_s << "\n"
+            << "  }\n"
+            << "}\n";
+  return 0;
+}
+
 int run_dump_coeffs(const std::filesystem::path& case_dir, const std::filesystem::path& output_dir, int override_order) {
   auto loaded = mf12_cpp::load_case(case_dir);
   if (override_order > 0) {
@@ -121,6 +156,17 @@ int main(int argc, char** argv) {
         override_order = std::stoi(argv[4]);
       }
       return run_verify(case_dir, output_dir, override_order);
+    }
+    if (command == "benchmark") {
+      int repeats = 3;
+      if (argc >= 4) {
+        repeats = std::stoi(argv[3]);
+      }
+      bool warmup = true;
+      if (argc >= 5) {
+        warmup = std::stoi(argv[4]) != 0;
+      }
+      return run_benchmark(case_dir, repeats, warmup);
     }
     if (command == "dump-coeffs") {
       if (argc < 4) {

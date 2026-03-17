@@ -1,11 +1,11 @@
 {
-  "case_id": "wavegroup_regression",
+  "case_id": "benchmark_dense_300",
   "runtime": {
-    "repeats": 1,
-    "mean_coefficient_s": 0.0716529,
-    "mean_reconstruction_s": 0.0200336,
-    "mean_total_s": 0.0916865,
-    "best_total_s": 0.0916865
+    "repeats": 3,
+    "mean_coefficient_s": 2.1576758,
+    "mean_reconstruction_s": 2.1850898666666665,
+    "mean_total_s": 4.3427656666666667,
+    "best_total_s": 3.9932681
   },
   "metadata": {
     "language": "matlab",

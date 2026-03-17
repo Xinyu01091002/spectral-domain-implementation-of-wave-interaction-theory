@@ -6,6 +6,8 @@ Current status:
 
 - `minimal_small` matches MATLAB at machine precision.
 - `wavegroup_regression` and `benchmark_medium` now also match MATLAB at machine precision for both `eta` and `phi`.
+- `benchmark_dense_300` is exported from MATLAB for larger retained-component speed sweeps.
+- `benchmark_dense_600` is exported from MATLAB when larger retained-component sweeps up to 600 are needed.
 
 ## Folder Structure
 
@@ -57,6 +59,21 @@ cpp/build/mf12_cpp verify cross_language_comparison/cases/minimal_small outputs/
 $env:PYTHONPATH = (Resolve-Path 'python/src').Path
 python python/scripts/compare_python_cpp_matlab.py cross_language_comparison/cases/minimal_small cross_language_comparison/cases/wavegroup_regression cross_language_comparison/cases/benchmark_medium
 ```
+
+7. Run a retained-component and physical-domain speed sweep:
+
+```powershell
+python cross_language_comparison/run_speed_sweep.py --warmup
+```
+
+This script:
+
+- derives temporary benchmark cases from `benchmark_medium`
+- truncates the retained components by descending `sqrt(a^2+b^2)`
+- sweeps square physical domains with `Lx = Ly`
+- keeps a fixed square reconstruction grid `Nx = Ny` unless you override `--grid-size`
+- times every available implementation among MATLAB, Python, and C++
+- writes CSV/JSON summaries plus line-plot figures under `outputs/cross_language_comparison/speed_sweep/`
 
 ## Case And Result Format
 

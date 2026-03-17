@@ -11,6 +11,8 @@ if ~exist(casesDir, 'dir'), mkdir(casesDir); end
 export_minimal_small(casesDir);
 export_wavegroup_regression(casesDir);
 export_benchmark_medium(casesDir);
+export_benchmark_dense_300(casesDir);
+export_benchmark_dense_600(casesDir);
 
 fprintf('Exported shared cross-language cases under: %s\n', casesDir);
 
@@ -126,7 +128,79 @@ cfg.sig_t2 = deg2rad(12);
 cfg.w1 = 0.55;
 cfg.w2 = 0.45;
 cfg.Hs_target = 3.5;
+cfg.component_count = 40;
 
+cfg = populate_directional_benchmark_components(cfg);
+cfg.tolerances = struct('eta_max_abs_err', 1e-6, 'phi_max_abs_err', 1e-6, 'eta_rms_err', 1e-7, 'phi_rms_err', 1e-7, 'eta_relative_l2_err', 1e-6, 'phi_relative_l2_err', 1e-6);
+export_case(casesDir, cfg);
+end
+
+function export_benchmark_dense_300(casesDir)
+cfg = struct();
+cfg.case_id = 'benchmark_dense_300';
+cfg.description = 'Dense deterministic benchmark case for cross-language speed sweeps with up to 300 retained components.';
+cfg.purpose = 'benchmark';
+cfg.order = 3;
+cfg.g = 9.81;
+cfg.h = 150;
+cfg.Ux = 0;
+cfg.Uy = 0;
+cfg.t = 0.0;
+cfg.Lx = 3000;
+cfg.Ly = 3000;
+cfg.Nx = 64;
+cfg.Ny = 64;
+cfg.subharmonic_mode = 'skip';
+cfg.Tp = 12;
+cfg.theta1 = deg2rad(25);
+cfg.theta2 = deg2rad(-35);
+cfg.sig_k_factor = 0.12;
+cfg.sig_t1 = deg2rad(10);
+cfg.sig_t2 = deg2rad(12);
+cfg.w1 = 0.55;
+cfg.w2 = 0.45;
+cfg.Hs_target = 3.5;
+cfg.component_count = 300;
+
+cfg = populate_directional_benchmark_components(cfg);
+cfg.tolerances = struct('eta_max_abs_err', 1e-6, 'phi_max_abs_err', 1e-6, 'eta_rms_err', 1e-7, 'phi_rms_err', 1e-7, 'eta_relative_l2_err', 1e-6, 'phi_relative_l2_err', 1e-6);
+export_case(casesDir, cfg);
+end
+
+function export_benchmark_dense_600(casesDir)
+cfg = struct();
+cfg.case_id = 'benchmark_dense_600';
+cfg.description = 'Dense deterministic benchmark case for cross-language speed sweeps with up to 600 retained components.';
+cfg.purpose = 'benchmark';
+cfg.order = 3;
+cfg.g = 9.81;
+cfg.h = 150;
+cfg.Ux = 0;
+cfg.Uy = 0;
+cfg.t = 0.0;
+cfg.Lx = 3000;
+cfg.Ly = 3000;
+cfg.Nx = 64;
+cfg.Ny = 64;
+cfg.subharmonic_mode = 'skip';
+cfg.Tp = 12;
+cfg.theta1 = deg2rad(25);
+cfg.theta2 = deg2rad(-35);
+cfg.sig_k_factor = 0.12;
+cfg.sig_t1 = deg2rad(10);
+cfg.sig_t2 = deg2rad(12);
+cfg.w1 = 0.55;
+cfg.w2 = 0.45;
+cfg.Hs_target = 3.5;
+cfg.component_count = 600;
+cfg.export_reference = false;
+
+cfg = populate_directional_benchmark_components(cfg);
+cfg.tolerances = struct('eta_max_abs_err', 1e-6, 'phi_max_abs_err', 1e-6, 'eta_rms_err', 1e-7, 'phi_rms_err', 1e-7, 'eta_relative_l2_err', 1e-6, 'phi_relative_l2_err', 1e-6);
+export_case(casesDir, cfg);
+end
+
+function cfg = populate_directional_benchmark_components(cfg)
 rng(20260306);
 dkx = 2*pi/cfg.Lx;
 dky = 2*pi/cfg.Ly;
@@ -152,8 +226,11 @@ valid = W > 1e-8 * max(W);
 kx_all = kx_all(valid);
 ky_all = ky_all(valid);
 W = W(valid);
+if numel(W) < cfg.component_count
+    error('Requested %d retained components, but only %d candidate components are available.', cfg.component_count, numel(W));
+end
 [~, idx_sort] = sort(W, 'descend');
-idx = idx_sort(1:40);
+idx = idx_sort(1:cfg.component_count);
 kx = kx_all(idx);
 ky = ky_all(idx);
 Wsel = W(idx);
@@ -169,8 +246,6 @@ cfg.a = amp .* cos(phase);
 cfg.b = amp .* sin(phase);
 cfg.kx = kx;
 cfg.ky = ky;
-cfg.tolerances = struct('eta_max_abs_err', 1e-6, 'phi_max_abs_err', 1e-6, 'eta_rms_err', 1e-7, 'phi_rms_err', 1e-7, 'eta_relative_l2_err', 1e-6, 'phi_relative_l2_err', 1e-6);
-export_case(casesDir, cfg);
 end
 
 function export_case(casesDir, cfg)
@@ -184,28 +259,31 @@ write_column_csv(fullfile(inputsDir, 'b.csv'), cfg.b);
 write_column_csv(fullfile(inputsDir, 'kx.csv'), cfg.kx);
 write_column_csv(fullfile(inputsDir, 'ky.csv'), cfg.ky);
 
-coeff_repeats = strcmp(cfg.purpose, 'benchmark') * 2 + 1;
-coeff_times = zeros(coeff_repeats, 1);
-recon_times = zeros(coeff_repeats, 1);
-for r = 1:coeff_repeats
-    tic;
-    coeffs = mf12_spectral_coefficients(cfg.order, cfg.g, cfg.h, cfg.a, cfg.b, cfg.kx, cfg.ky, cfg.Ux, cfg.Uy, struct('enable_subharmonic', false));
-    coeff_times(r) = toc;
-    coeffs.third_order_subharmonic_mode = cfg.subharmonic_mode;
-    tic;
-    [eta, phi, X, Y] = mf12_spectral_surface(coeffs, cfg.Lx, cfg.Ly, cfg.Nx, cfg.Ny, cfg.t);
-    recon_times(r) = toc;
-end
-writematrix(eta, fullfile(refDir, 'eta.csv'));
-writematrix(phi, fullfile(refDir, 'phi.csv'));
-write_column_csv(fullfile(refDir, 'x.csv'), X(1,:));
-write_column_csv(fullfile(refDir, 'y.csv'), Y(:,1));
+export_reference = ~isfield(cfg, 'export_reference') || cfg.export_reference;
+if export_reference
+    coeff_repeats = strcmp(cfg.purpose, 'benchmark') * 2 + 1;
+    coeff_times = zeros(coeff_repeats, 1);
+    recon_times = zeros(coeff_repeats, 1);
+    for r = 1:coeff_repeats
+        tic;
+        coeffs = mf12_spectral_coefficients(cfg.order, cfg.g, cfg.h, cfg.a, cfg.b, cfg.kx, cfg.ky, cfg.Ux, cfg.Uy, struct('enable_subharmonic', false));
+        coeff_times(r) = toc;
+        coeffs.third_order_subharmonic_mode = cfg.subharmonic_mode;
+        tic;
+        [eta, phi, X, Y] = mf12_spectral_surface(coeffs, cfg.Lx, cfg.Ly, cfg.Nx, cfg.Ny, cfg.t);
+        recon_times(r) = toc;
+    end
+    writematrix(eta, fullfile(refDir, 'eta.csv'));
+    writematrix(phi, fullfile(refDir, 'phi.csv'));
+    write_column_csv(fullfile(refDir, 'x.csv'), X(1,:));
+    write_column_csv(fullfile(refDir, 'y.csv'), Y(:,1));
 
-result = struct();
-result.case_id = cfg.case_id;
-result.runtime = struct('repeats', coeff_repeats, 'mean_coefficient_s', mean(coeff_times), 'mean_reconstruction_s', mean(recon_times), 'mean_total_s', mean(coeff_times + recon_times), 'best_total_s', min(coeff_times + recon_times));
-result.metadata = struct('language', 'matlab', 'matlab_version', version, 'fft_backend', 'MATLAB ifft2', 'implementation', 'mf12_spectral_coefficients + mf12_spectral_surface');
-write_json(fullfile(refDir, 'result.json'), result);
+    result = struct();
+    result.case_id = cfg.case_id;
+    result.runtime = struct('repeats', coeff_repeats, 'mean_coefficient_s', mean(coeff_times), 'mean_reconstruction_s', mean(recon_times), 'mean_total_s', mean(coeff_times + recon_times), 'best_total_s', min(coeff_times + recon_times));
+    result.metadata = struct('language', 'matlab', 'matlab_version', version, 'fft_backend', 'MATLAB ifft2', 'implementation', 'mf12_spectral_coefficients + mf12_spectral_surface');
+    write_json(fullfile(refDir, 'result.json'), result);
+end
 
 manifest = struct();
 manifest.case_id = cfg.case_id;
@@ -213,7 +291,11 @@ manifest.description = cfg.description;
 manifest.purpose = cfg.purpose;
 manifest.inputs = struct('order', cfg.order, 'g', cfg.g, 'h', cfg.h, 'Ux', cfg.Ux, 'Uy', cfg.Uy, 'Lx', cfg.Lx, 'Ly', cfg.Ly, 'Nx', cfg.Nx, 'Ny', cfg.Ny, 't', cfg.t, 'subharmonic_mode', cfg.subharmonic_mode);
 manifest.arrays = struct('a', fullfile('inputs', 'a.csv'), 'b', fullfile('inputs', 'b.csv'), 'kx', fullfile('inputs', 'kx.csv'), 'ky', fullfile('inputs', 'ky.csv'));
-manifest.reference = struct('arrays', struct('eta', fullfile('reference', 'matlab', 'eta.csv'), 'phi', fullfile('reference', 'matlab', 'phi.csv'), 'x', fullfile('reference', 'matlab', 'x.csv'), 'y', fullfile('reference', 'matlab', 'y.csv')), 'metadata', fullfile('reference', 'matlab', 'result.json'));
+if export_reference
+    manifest.reference = struct('arrays', struct('eta', fullfile('reference', 'matlab', 'eta.csv'), 'phi', fullfile('reference', 'matlab', 'phi.csv'), 'x', fullfile('reference', 'matlab', 'x.csv'), 'y', fullfile('reference', 'matlab', 'y.csv')), 'metadata', fullfile('reference', 'matlab', 'result.json'));
+else
+    manifest.reference = struct();
+end
 manifest.tolerances = cfg.tolerances;
 write_json(fullfile(caseDir, 'case.json'), manifest);
 fprintf('Exported case: %s\n', caseDir);
