@@ -66,6 +66,7 @@ More specifically:
 - MATLAB direct and spectral workflows are the reference implementation.
 - Python matches MATLAB on the shared spectral cases to machine precision.
 - C++ matches MATLAB on the shared spectral cases to machine precision.
+- Python and C++ currently target the shared spectral workflow rather than the MATLAB direct physical-space path.
 - the MATLAB coefficient and reconstruction workflow in this repository follows and is verified against the DTU MATLAB release by David R. Fuhrman
 - Shared regression cases currently include:
   - `minimal_small`
@@ -233,6 +234,7 @@ See these for more focused usage details:
 - [python/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/python/README.md)
 - [cpp/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cpp/README.md)
 - [cross_language_comparison/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cross_language_comparison/README.md)
+- [docs/API_OVERVIEW.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/docs/API_OVERVIEW.md)
 
 ## Citation and License
 

@@ -1,23 +1,25 @@
-# Cross-Language Port Workflow
+# Cross-Language Workflow
 
-This repository now includes a Python-first cross-language scaffold for the MF12 spectral workflow while keeping MATLAB as the numerical ground truth.
+This directory documents the shared MATLAB, Python, and C++ workflow for the spectral MF12 path.
 
-Current status:
+MATLAB remains the numerical ground truth. Python and C++ consume the same archived shared cases and compare their spectral outputs against the MATLAB references.
 
-- `minimal_small` matches MATLAB at machine precision.
-- `wavegroup_regression` and `benchmark_medium` now also match MATLAB at machine precision for both `eta` and `phi`.
-- `benchmark_dense_300` is exported from MATLAB for larger retained-component speed sweeps.
-- `benchmark_dense_600` is exported from MATLAB when larger retained-component sweeps up to 600 are needed.
+## Current Status
+
+- `minimal_small` matches MATLAB at machine precision
+- `wavegroup_regression` matches MATLAB at machine precision for both `eta` and `phi`
+- `benchmark_medium` matches MATLAB at machine precision for both `eta` and `phi`
+- `benchmark_dense_300` and `benchmark_dense_600` are available as larger retained-component benchmark cases
 
 ## Folder Structure
 
 - `cross_language_comparison/`: shared portable cases plus this workflow note
 - `cross_language_comparison/cases/`: language-neutral validation and benchmark cases
-- `python/`: Python package, tests, and helper scripts for the spectral-only MF12 path
-- `cpp/`: C++ scaffold that reads the same shared case format
 - `matlab/repro/`: MATLAB exporters that materialize shared cases and MATLAB-only reference artifacts
+- `python/`: Python package, tests, and helper scripts for the spectral MF12 path
+- `cpp/`: C++ spectral CLI that reads the same shared case format
 
-## Workflow
+## Standard Workflow
 
 1. Generate or refresh shared cases from MATLAB:
 
@@ -32,35 +34,34 @@ $env:PYTHONPATH = (Resolve-Path 'python/src').Path
 python -m mf12_python.cli verify cross_language_comparison/cases/minimal_small --repeats 1
 ```
 
-3. Run Python benchmarks across all shared cases:
+3. Build the C++ CLI:
+
+```powershell
+cmake -S cpp -B cpp/build -G Ninja -DCMAKE_CXX_COMPILER=g++
+cmake --build cpp/build
+```
+
+4. Verify one case from C++:
+
+```powershell
+cpp/build/mf12_cpp.exe verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp/minimal_small
+```
+
+5. Run Python benchmarks across the shared cases:
 
 ```powershell
 $env:PYTHONPATH = (Resolve-Path 'python/src').Path
 python python/scripts/run_benchmarks.py
 ```
 
-4. Build the C++ case-inspection scaffold when a C++ compiler is available:
-
-```powershell
-cmake -S cpp -B cpp/build
-cmake --build cpp/build
-cpp/build/mf12_cpp inspect cross_language_comparison/cases/minimal_small
-```
-
-5. Run the current C++ order-2 verification path on the smallest shared case:
-
-```powershell
-cpp/build/mf12_cpp verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp/minimal_small
-```
-
-6. Generate a Python-vs-C++-vs-MATLAB summary across the shared cases:
+6. Generate a MATLAB-vs-Python-vs-C++ summary across the shared cases:
 
 ```powershell
 $env:PYTHONPATH = (Resolve-Path 'python/src').Path
 python python/scripts/compare_python_cpp_matlab.py cross_language_comparison/cases/minimal_small cross_language_comparison/cases/wavegroup_regression cross_language_comparison/cases/benchmark_medium
 ```
 
-7. Run a retained-component and physical-domain speed sweep:
+7. Run a retained-component and grid-size speed sweep when needed:
 
 ```powershell
 python cross_language_comparison/run_speed_sweep.py --warmup
@@ -69,35 +70,21 @@ python cross_language_comparison/run_speed_sweep.py --warmup
 This script:
 
 - derives temporary benchmark cases from `benchmark_medium`
-- truncates the retained components by descending `sqrt(a^2+b^2)`
-- sweeps square physical domains with `Lx = Ly`
-- keeps a fixed square reconstruction grid `Nx = Ny` unless you override `--grid-size`
+- truncates retained components by descending `sqrt(a^2 + b^2)`
+- sweeps square reconstruction grids with `Nx = Ny`
 - times every available implementation among MATLAB, Python, and C++
-- writes CSV/JSON summaries plus line-plot figures under `outputs/cross_language_comparison/speed_sweep/`
+- writes CSV and JSON summaries plus figures under `outputs/cross_language_comparison/speed_sweep/`
 
 ## Case And Result Format
 
-Each case folder contains:
+Each shared case folder contains:
 
-- `case.json`: scalar inputs, file references, and tolerances
+- `case.json`: scalar inputs, file references, metadata, and tolerances
 - `inputs/*.csv`: `a`, `b`, `kx`, and `ky`
 - `reference/matlab/*.csv`: MATLAB `eta`, `phi`, `x`, and `y`
 - `reference/matlab/result.json`: MATLAB runtime metadata
 
-Python verification outputs write:
-
-- `eta.csv`
-- `phi.csv`
-- `x.csv`
-- `y.csv`
-- `result.json`
-
-The C++ scaffold currently reads the same case format and now supports:
-
-- a fully matching `minimal_small` run
-- an in-progress third-order path for the larger cases
-
-As the solver grows, it should keep writing the same result bundle shape as Python:
+Python and C++ verification outputs both write the same result bundle shape:
 
 - `eta.csv`
 - `phi.csv`
@@ -115,16 +102,11 @@ The comparison metrics reported today are:
 
 ## Porting Note
 
-One important implementation trap showed up during the Python port and should be preserved for future C++ work:
+One important implementation trap should stay documented for future porting work:
 
-- `Lambda3` is easy to mistranscribe because only its first grouped contribution is multiplied by the leading `h^2 / (4 * beta)` prefactor.
-- The later `Fnpm`, `Fnpp`, `Fmpp`, `Gnpm`, `Gnpp`, and `Gmpp` terms are separate additive terms with their own `1 / beta` scaling.
-- If those later terms are accidentally pulled under the same outer prefactor, the third-order `G_*` coefficients become much too large.
-- That bug can make `eta` wrong while `phi` still looks correct, because the retained MF12 `phi` reconstruction depends primarily on the `F_*` / `mu_*` side, while the `eta` reconstruction uses the `G_*` / `Lambda3` side directly.
+- `Lambda3` is easy to mistranscribe because only its first grouped contribution is multiplied by the leading `h^2 / (4 * beta)` prefactor
+- the later `Fnpm`, `Fnpp`, `Fmpp`, `Gnpm`, `Gnpp`, and `Gmpp` terms are separate additive terms with their own `1 / beta` scaling
+- if those later terms are accidentally pulled under the same outer prefactor, the third-order `G_*` coefficients become much too large
+- that bug can make `eta` wrong while `phi` still looks correct, because the retained MF12 `phi` reconstruction depends primarily on the `F_*` and `mu_*` side, while `eta` uses the `G_*` and `Lambda3` side directly
 
-In practice, if a future port shows:
-
-- `phi` matching MATLAB closely
-- but third-order `eta`, especially the `n+m+p` superharmonic content, being badly wrong
-
-then `Lambda3` transcription should be checked before anything else.
+If a future port shows `phi` matching MATLAB closely but third-order `eta` being badly wrong, check the `Lambda3` transcription first.
