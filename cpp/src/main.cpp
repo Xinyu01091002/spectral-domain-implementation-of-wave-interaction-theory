@@ -9,7 +9,27 @@
 #include <stdexcept>
 #include <string>
 
+#if defined(MF12_HAVE_OPENMP)
+#include <omp.h>
+#endif
+
 namespace {
+
+int configured_parallel_threads() {
+#if defined(MF12_HAVE_OPENMP)
+  return omp_get_max_threads();
+#else
+  return 1;
+#endif
+}
+
+const char* parallel_backend_name() {
+#if defined(MF12_HAVE_OPENMP)
+  return "openmp";
+#else
+  return "serial";
+#endif
+}
 
 void print_usage() {
   std::cout
@@ -93,6 +113,10 @@ int run_benchmark(const std::filesystem::path& case_dir, int repeats, bool warmu
             << "  \"grid\": {\n"
             << "    \"Nx\": " << loaded.manifest.inputs.Nx << ",\n"
             << "    \"Ny\": " << loaded.manifest.inputs.Ny << "\n"
+            << "  },\n"
+            << "  \"parallel\": {\n"
+            << "    \"backend\": \"" << parallel_backend_name() << "\",\n"
+            << "    \"configured_threads\": " << configured_parallel_threads() << "\n"
             << "  },\n"
             << "  \"runtime\": {\n"
             << "    \"repeats\": " << result.runtime.repeats << ",\n"

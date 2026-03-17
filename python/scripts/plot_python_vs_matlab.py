@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +11,10 @@ import numpy as np
 from mf12_python.compare import compare_fields
 from mf12_python.io import load_case
 from mf12_python.spectral import run_case
+
+
+def generated_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def main() -> None:
@@ -66,6 +71,15 @@ def make_case_figure(case: dict, result: dict, out_dir: Path) -> dict:
     draw_hist(axes[2, 2], eta_py - eta_m, phi_py - phi_m)
     draw_text_panel(axes[2, 3], case, result, eta_metrics, phi_metrics)
 
+    fig.text(
+        0.995,
+        0.995,
+        f"Generated: {generated_timestamp()}",
+        ha="right",
+        va="top",
+        fontsize=9,
+        color="#555555",
+    )
     fig.suptitle(f"Python vs MATLAB: {case['case_id']}", fontsize=16)
     png_path = out_dir / f"{case['case_id']}_python_vs_matlab.png"
     fig.savefig(png_path, dpi=180)

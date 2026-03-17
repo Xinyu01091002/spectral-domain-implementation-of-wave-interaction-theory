@@ -3,12 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from mf12_python.io import load_case
 from mf12_python.spectral import spectral_coefficients, spectral_surface
+
+
+def generated_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def main() -> None:
@@ -173,6 +178,15 @@ def make_figure(case: dict, matlab: dict, python: dict, cpp: dict, output_path: 
         f"global C++ max|diff|={max(finite_max(cpp_center_err), finite_max(cpp_diag_err)):.2e}"
     )
     fig.text(0.5, 0.01, summary, ha="center", va="bottom", family="monospace", fontsize=10)
+    fig.text(
+        0.995,
+        0.995,
+        f"Generated: {generated_timestamp()}",
+        ha="right",
+        va="top",
+        fontsize=9,
+        color="#555555",
+    )
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
     err_handles, err_labels = axes[1, 0].get_legend_handles_labels()

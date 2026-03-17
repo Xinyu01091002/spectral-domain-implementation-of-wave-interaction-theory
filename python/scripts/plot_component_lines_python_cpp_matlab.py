@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -198,6 +199,10 @@ def build_summary_text(case: dict, matlab: dict, python: dict, cpp: dict) -> str
     return "\n".join(lines)
 
 
+def generated_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
 def make_figure(case: dict, matlab: dict, python: dict, cpp: dict, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig = plt.figure(figsize=(17, 10), constrained_layout=True)
@@ -250,6 +255,15 @@ def make_figure(case: dict, matlab: dict, python: dict, cpp: dict, output_path: 
     legend.get_frame().set_edgecolor("#cccccc")
     legend.get_frame().set_linewidth(0.8)
     legend.get_frame().set_alpha(0.95)
+    fig.text(
+        0.995,
+        0.995,
+        f"Generated: {generated_timestamp()}",
+        ha="right",
+        va="top",
+        fontsize=9,
+        color="#555555",
+    )
     fig.suptitle(
         "Wavegroup Component Summary: MATLAB vs Python vs C++\n"
         "Top row: centerline, middle row: diagonal, bottom row: directional setup and error summary",

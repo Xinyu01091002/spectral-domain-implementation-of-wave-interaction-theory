@@ -59,6 +59,47 @@ FFTW notes:
 - the project first tries `find_package(FFTW3)` and then falls back to this simple MinGW DLL layout
 - when the DLL is found, CMake copies it next to `mf12_cpp.exe` after linking so the CLI can run without editing `PATH`
 
+Linux notes:
+
+- the shared-case inputs are portable across platforms:
+  - `case.json`
+  - `inputs/*.csv`
+- the compiled Windows binary is not portable to Linux
+- to run on Linux, rebuild from source against the Linux toolchain and Linux FFTW
+
+Typical Linux setup:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake ninja-build libfftw3-dev
+cmake -S cpp -B cpp/build -G Ninja -DMF12_ENABLE_OPENMP=ON -DMF12_ENABLE_FFTW=ON
+cmake --build cpp/build
+./cpp/build/mf12_cpp verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp_linux/minimal_small
+```
+
+On Linux, FFTW is typically discovered through the system package manager rather than the Windows-style `MF12_FFTW_ROOT` layout used in this repository's current local Windows setup.
+
+Parallel control:
+
+- when OpenMP is enabled, the runtime thread count can be controlled without recompiling
+- on Windows PowerShell:
+
+```powershell
+$env:OMP_NUM_THREADS = "8"
+cpp/build/mf12_cpp.exe benchmark cross_language_comparison/cases/benchmark_dense_300 1 1
+```
+
+- on Linux/macOS shells:
+
+```bash
+OMP_NUM_THREADS=8 ./cpp/build/mf12_cpp benchmark cross_language_comparison/cases/benchmark_dense_300 1 1
+```
+
+- the benchmark JSON now reports:
+  - `parallel.backend`
+  - `parallel.configured_threads`
+- this makes it easier to keep benchmark logs honest when comparing single-thread and multi-thread runs
+
 Optimization log:
 
 - switched C++ reconstruction from the original direct inverse-DFT path to FFT-based reconstruction:

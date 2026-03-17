@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +18,10 @@ LABELS = [
     "Second Subharmonic",
     "Third Superharmonic",
 ]
+
+
+def generated_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def main() -> None:
@@ -184,6 +189,15 @@ def make_figure(case: dict, matlab: dict, python: dict, output_path: Path) -> No
     legend.get_frame().set_edgecolor("#cccccc")
     legend.get_frame().set_linewidth(0.8)
     legend.get_frame().set_alpha(0.95)
+    fig.text(
+        0.995,
+        0.995,
+        f"Generated: {generated_timestamp()}",
+        ha="right",
+        va="top",
+        fontsize=9,
+        color="#555555",
+    )
     fig.suptitle(
         "Wavegroup Component Summary: MATLAB spectral vs Python spectral\n"
         "Top row: centerline, middle row: diagonal; bottom row: setup and machine-precision summary",
