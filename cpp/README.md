@@ -30,6 +30,80 @@ The CLI entry point is `cpp/build/mf12_cpp.exe` on Windows and `cpp/build/mf12_c
 - reconstruction prefers FFTW3 when available and otherwise falls back to the in-repo radix-2 inverse FFT path for power-of-two grids, with a direct inverse-DFT fallback for other sizes
 - third-order coefficient profiling separates `np2m`, `2npm`, and `npmpp`, and the `npmpp` hotspot can use optional OpenMP parallelization
 
+## Prerequisites
+
+- a C++17-capable compiler such as `g++` 9+ or a recent MinGW-w64 / WinLibs / MSYS2 toolchain
+- CMake 3.18 or newer
+- Ninja is recommended for the commands below
+- FFTW3 is strongly recommended for better FFT performance
+- OpenMP comes from the compiler/runtime, not from this repository
+
+FFTW behavior:
+
+- when FFTW3 is available and `MF12_ENABLE_FFTW=ON`, the CLI links to FFTW
+- when FFTW is not found, the code falls back to the in-repo radix-2 inverse FFT for power-of-two grids and a direct inverse-DFT fallback otherwise
+
+## Installation / Build
+
+### Ubuntu / Debian-like Linux
+
+Install dependencies:
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build libfftw3-dev pkg-config
+```
+
+Verify the toolchain:
+
+```bash
+cmake --version
+g++ --version
+pkg-config --modversion fftw3
+```
+
+Configure and build from the repository root:
+
+```bash
+cmake -S cpp -B cpp/build -G Ninja -DMF12_ENABLE_OPENMP=ON -DMF12_ENABLE_FFTW=ON
+cmake --build cpp/build
+```
+
+Run a quick verification command:
+
+```bash
+./cpp/build/mf12_cpp verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp_linux/minimal_small
+```
+
+### Windows
+
+Recommended toolchain:
+
+- use MinGW-w64, WinLibs, or MSYS2 with `g++`
+- install CMake and Ninja and ensure they are available on `PATH`
+- install FFTW3 system-wide, or place it in a local folder and pass `-DMF12_FFTW_ROOT=C:/path/to/fftw`
+- OpenMP support is provided by the chosen compiler/runtime
+
+Configure and build from the repository root:
+
+```powershell
+cmake -S cpp -B cpp/build -G Ninja -DCMAKE_CXX_COMPILER=g++ -DMF12_ENABLE_OPENMP=ON -DMF12_ENABLE_FFTW=ON
+cmake --build cpp/build
+```
+
+If FFTW is installed in a non-default location:
+
+```powershell
+cmake -S cpp -B cpp/build -G Ninja -DCMAKE_CXX_COMPILER=g++ -DMF12_ENABLE_OPENMP=ON -DMF12_ENABLE_FFTW=ON -DMF12_FFTW_ROOT=C:/tools/fftw3-mingw-dll
+cmake --build cpp/build
+```
+
+Run a quick verification command:
+
+```powershell
+cpp/build/mf12_cpp.exe verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp/minimal_small
+```
+
 ## Build And Run
 
 From the repository root:
@@ -82,21 +156,12 @@ cpp/build/mf12_cpp.exe benchmark cross_language_comparison/cases/benchmark_dense
 OMP_NUM_THREADS=8 ./cpp/build/mf12_cpp benchmark cross_language_comparison/cases/benchmark_dense_300 1 1
 ```
 
-## Linux Notes
+## Troubleshooting / Compatibility
 
-- the shared-case inputs are portable across platforms
-- the compiled Windows binary is not portable to Linux
-- to run on Linux, rebuild from source against the Linux toolchain and Linux FFTW
-
-Typical Linux setup:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y build-essential cmake ninja-build libfftw3-dev
-cmake -S cpp -B cpp/build -G Ninja -DMF12_ENABLE_OPENMP=ON -DMF12_ENABLE_FFTW=ON
-cmake --build cpp/build
-./cpp/build/mf12_cpp verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp_linux/minimal_small
-```
+- very old environments, including Ubuntu 16.04-era `cmake` and `g++`, may be too old for this C++17 build
+- if OpenMP is not detected, the build can still succeed, but the hotspot loops run without compiler-managed parallelism and performance may drop
+- if FFTW is not found, the project does not fail by default; it falls back to slower internal reconstruction paths
+- the shared-case inputs are portable across platforms, but binaries are not; rebuild on each target OS
 
 ## Porting Notes
 

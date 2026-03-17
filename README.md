@@ -120,10 +120,35 @@ python python/scripts/compare_python_cpp_matlab.py cross_language_comparison/cas
 
 ### C++
 
+Prerequisites:
+
+- C++17-capable compiler such as `g++` 9+ or a recent MinGW-w64 / WinLibs / MSYS2 toolchain
+- CMake 3.18 or newer
+- Ninja is recommended as the generator used in the examples below
+- FFTW3 is strongly recommended for faster reconstruction, but the repo can fall back to an internal inverse-FFT / inverse-DFT path when FFTW is unavailable
+- OpenMP support comes from your compiler and runtime; this repo only enables it when the toolchain provides it
+
+Linux (Ubuntu / Debian-like) setup:
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build libfftw3-dev pkg-config
+cmake --version
+g++ --version
+pkg-config --modversion fftw3
+```
+
+Windows setup:
+
+- Use a practical `g++`-based toolchain such as MinGW-w64, WinLibs, or MSYS2
+- Install CMake and Ninja, and make sure `cmake`, `ninja`, and `g++` are on `PATH`
+- Install FFTW3 system-wide if available, or place it in a known local folder and point CMake at it with `-DMF12_FFTW_ROOT=...`
+- OpenMP is provided by the selected compiler/runtime rather than by this repository
+
 Build from the repository root:
 
 ```powershell
-cmake -S cpp -B cpp/build -G Ninja -DCMAKE_CXX_COMPILER=g++
+cmake -S cpp -B cpp/build -G Ninja -DCMAKE_CXX_COMPILER=g++ -DMF12_ENABLE_FFTW=ON -DMF12_ENABLE_OPENMP=ON
 cmake --build cpp/build
 ```
 
@@ -134,6 +159,21 @@ cpp/build/mf12_cpp.exe inspect cross_language_comparison/cases/minimal_small
 cpp/build/mf12_cpp.exe validate cross_language_comparison/cases/minimal_small
 cpp/build/mf12_cpp.exe verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp/minimal_small
 ```
+
+Linux equivalents:
+
+```bash
+cmake -S cpp -B cpp/build -G Ninja -DMF12_ENABLE_FFTW=ON -DMF12_ENABLE_OPENMP=ON
+cmake --build cpp/build
+./cpp/build/mf12_cpp inspect cross_language_comparison/cases/minimal_small
+./cpp/build/mf12_cpp verify cross_language_comparison/cases/minimal_small outputs/cross_language_comparison/verify_cpp_linux/minimal_small
+```
+
+Compatibility notes:
+
+- very old environments, including Ubuntu 16.04-era `cmake` and `g++`, may be too old for the current C++17 / CMake setup
+- if OpenMP is not detected, the code can still build, but hotspot loops run single-threaded and may be slower
+- if FFTW is not found, the C++ path falls back to the in-repo radix-2 inverse FFT for power-of-two grids and a direct inverse-DFT fallback for other sizes, so FFTW is strongly recommended but not mandatory
 
 ## Core MATLAB APIs
 
@@ -234,7 +274,13 @@ See these for more focused usage details:
 - [python/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/python/README.md)
 - [cpp/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cpp/README.md)
 - [cross_language_comparison/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cross_language_comparison/README.md)
+- [docs/README.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/docs/README.md)
 - [docs/API_OVERVIEW.md](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/docs/API_OVERVIEW.md)
+
+Documentation rule of thumb:
+
+- use the nearest README for setup, build, and common commands
+- use [docs/](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/docs) for deeper reference notes, benchmark archives, and cross-cutting documentation
 
 ## Citation and License
 
