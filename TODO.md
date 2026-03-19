@@ -31,6 +31,7 @@ This checklist tracks the work needed to turn the current research workspace int
 
 - [x] Keep one fast smoke test that runs in seconds.
 - [x] Add one regression test for direct-vs-spectral consistency.
+- [x] Complete MATLAB direct-vs-spectral kinematics verification on constant-`z` planes, including `u`, `v`, `w`, `p`, `phi`, `uV`, `vV`, `a_x`, and `a_y`.
 - [x] Keep one representative manuscript reproduction entry point.
 - [ ] Document expected output locations and runtime expectations.
 
@@ -52,6 +53,8 @@ This checklist tracks the work needed to turn the current research workspace int
 - [x] Add fixed validation cases with archived expected outputs so cross-language comparisons are numerical, not only visual.
 - [x] Implement the core MF12 spectral reconstruction in C++.
 - [x] Implement the same reconstruction path in Python.
+- [ ] Implement the spectral kinematics workflow in Python, matching MATLAB `mf12_spectral_kinematics` on constant-`z` planes.
+- [ ] Implement the spectral kinematics workflow in C++, matching MATLAB `mf12_spectral_kinematics` on constant-`z` planes.
 - [ ] Decide whether Python should begin as pure NumPy or include an accelerated path (for example `numba`, `pybind11`, or a C extension).
 - [x] Add a cross-language verification script that compares MATLAB, C++, and Python outputs for `eta` and selected `phi` diagnostics.
 - [ ] Add a reproducible benchmark harness that records:

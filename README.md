@@ -31,6 +31,7 @@ The main outputs are:
 
 - free-surface elevation `eta`
 - free-surface velocity potential `phi`
+- subsurface kinematics on constant-z planes: `u`, `v`, `w`, `p`, `phi`, `uV`, `vV`, `a_x`, `a_y`
 
 In practice, this repo is used for:
 
@@ -64,6 +65,7 @@ More specifically:
 ## Current Status
 
 - MATLAB direct and spectral workflows are the reference implementation.
+- MATLAB direct-vs-spectral verification now covers both surface reconstruction and constant-z kinematics reconstruction to machine precision on the retained verification cases.
 - Python matches MATLAB on the shared spectral cases to machine precision.
 - C++ matches MATLAB on the shared spectral cases to machine precision.
 - Python and C++ currently target the shared spectral workflow rather than the MATLAB direct physical-space path.
@@ -94,6 +96,8 @@ Useful MATLAB entry points:
 - [run_spectral_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/examples/run_spectral_minimal.m)
 - [smoke_test_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/tests/smoke_test_minimal.m)
 - [plot_phi3_wavegroup_lines.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_phi3_wavegroup_lines.m)
+- [plot_phi3_direct_vs_spectral.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_phi3_direct_vs_spectral.m)
+- [plot_kinematics_direct_vs_spectral.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_kinematics_direct_vs_spectral.m)
 
 ### Python
 
@@ -183,16 +187,22 @@ The preferred MF12 function entry points are:
 - `mf12_direct_surface`
 - `mf12_spectral_coefficients`
 - `mf12_spectral_surface`
+- `kinematicsMF12`
+- `mf12_spectral_kinematics`
 
 Typical usage:
 
 ```matlab
 coeffs_direct = mf12_direct_coefficients(order, g, h, a, b, kx, ky, Ux, Uy);
 [eta_direct, phi_direct] = mf12_direct_surface(order, coeffs_direct, X, Y, t);
+[u_direct, v_direct, w_direct, p_direct, phi_vol_direct] = kinematicsMF12(order, coeffs_direct, X, Y, z, t);
 
 coeffs_spec = mf12_spectral_coefficients(order, g, h, a, b, kx, ky, Ux, Uy);
 [eta_spec, phi_spec] = mf12_spectral_surface(coeffs_spec, Lx, Ly, Nx, Ny, t);
+[u_spec, v_spec, w_spec, p_spec, phi_vol_spec] = mf12_spectral_kinematics(coeffs_spec, Lx, Ly, Nx, Ny, z, t);
 ```
+
+`mf12_spectral_kinematics` reconstructs MF12 kinematics on a regular `x-y` grid at a constant `z` level and is verified against `kinematicsMF12` to machine precision for the validated MATLAB cases.
 
 ## Cross-Language Workflow
 
@@ -255,6 +265,10 @@ For the wave-group line-comparison figures, MATLAB component references are also
   - [smoke_test_minimal.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/tests/smoke_test_minimal.m)
 - wave-group verification figure:
   - [plot_phi3_wavegroup_lines.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_phi3_wavegroup_lines.m)
+- surface verification figure:
+  - [plot_phi3_direct_vs_spectral.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_phi3_direct_vs_spectral.m)
+- kinematics verification figure:
+  - [plot_kinematics_direct_vs_spectral.m](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/matlab/verification/plot_kinematics_direct_vs_spectral.m)
 - Python validation:
   - [cli.py](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/python/src/mf12_python/cli.py)
 - C++ validation:
