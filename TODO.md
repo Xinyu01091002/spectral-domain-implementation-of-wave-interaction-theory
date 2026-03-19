@@ -53,8 +53,8 @@ This checklist tracks the work needed to turn the current research workspace int
 - [x] Add fixed validation cases with archived expected outputs so cross-language comparisons are numerical, not only visual.
 - [x] Implement the core MF12 spectral reconstruction in C++.
 - [x] Implement the same reconstruction path in Python.
-- [ ] Implement the spectral kinematics workflow in Python, matching MATLAB `mf12_spectral_kinematics` on constant-`z` planes.
-- [ ] Implement the spectral kinematics workflow in C++, matching MATLAB `mf12_spectral_kinematics` on constant-`z` planes.
+- [x] Implement the spectral kinematics workflow in Python, matching MATLAB `mf12_spectral_kinematics` on constant-`z` planes.
+- [x] Implement the spectral kinematics workflow in C++, matching MATLAB `mf12_spectral_kinematics` on constant-`z` planes.
 - [ ] Decide whether Python should begin as pure NumPy or include an accelerated path (for example `numba`, `pybind11`, or a C extension).
 - [x] Add a cross-language verification script that compares MATLAB, C++, and Python outputs for `eta` and selected `phi` diagnostics.
 - [ ] Add a reproducible benchmark harness that records:
@@ -71,6 +71,9 @@ This checklist tracks the work needed to turn the current research workspace int
 - [ ] Generate one archived reference benchmark summary and figure that report accuracy and speed for all three implementations on the shared cases.
 - [ ] Archive benchmark outputs under `outputs/` and keep one reference log under `docs/benchmarks/`.
 - [ ] Document build and run instructions for the C++ and Python implementations in the README once the first working versions exist.
+- [ ] Evaluate a future nonlinear-surface kinematics workflow:
+  - define whether kinematics should be reported on the still-water `z` plane, the instantaneous free surface, or both
+  - decide whether this should extend the current spectral path or live as a separate post-processing workflow
 - [ ] Evaluate a benchmark-only streaming or chunked `n+m+p` accumulation path for large retained-component cases so C++/Python do not need to materialize the full `npmpp` coefficient arrays in memory:
   - keep this out of the current correctness/debug path for now
   - prefer in-memory chunked accumulation into the final spectra rather than writing intermediate coefficient blocks to disk

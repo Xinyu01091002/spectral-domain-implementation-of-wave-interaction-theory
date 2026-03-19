@@ -13,6 +13,7 @@
     "Nx": 64,
     "Ny": 64,
     "t": 0,
+    "z_kinematics": -30,
     "subharmonic_mode": "skip"
   },
   "arrays": {
@@ -28,6 +29,15 @@
     "eta_rms_err": 1E-7,
     "phi_rms_err": 1E-7,
     "eta_relative_l2_err": 1E-6,
-    "phi_relative_l2_err": 1E-6
+    "phi_relative_l2_err": 1E-6,
+    "u_max_abs_err": 1E-6,
+    "v_max_abs_err": 1E-6,
+    "w_max_abs_err": 1E-6,
+    "p_max_abs_err": 1E-6,
+    "phi_vol_max_abs_err": 1E-6,
+    "uV_max_abs_err": 1E-6,
+    "vV_max_abs_err": 1E-6,
+    "a_x_max_abs_err": 1E-6,
+    "a_y_max_abs_err": 1E-6
   }
 }

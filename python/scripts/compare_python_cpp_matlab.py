@@ -14,13 +14,18 @@ from mf12_python.spectral import run_case
 
 def load_cpp_result(case_id: str, root: Path) -> dict[str, np.ndarray | dict]:
     result_dir = root / case_id
-    return {
+    result: dict[str, np.ndarray | dict] = {
         "eta": np.loadtxt(result_dir / "eta.csv", delimiter=","),
         "phi": np.loadtxt(result_dir / "phi.csv", delimiter=","),
         "x": np.loadtxt(result_dir / "x.csv", delimiter=",").reshape(-1),
         "y": np.loadtxt(result_dir / "y.csv", delimiter=",").reshape(-1),
         "meta": json.loads((result_dir / "result.json").read_text(encoding="utf-8")),
     }
+    for name in ("u", "v", "w", "p", "phi_vol", "uV", "vV", "a_x", "a_y"):
+        path = result_dir / f"{name}.csv"
+        if path.exists():
+            result[name] = np.loadtxt(path, delimiter=",")
+    return result
 
 
 def max_abs_between(a: np.ndarray, b: np.ndarray) -> float:
@@ -61,6 +66,13 @@ def main() -> None:
             "python_total_s": py["runtime"]["mean_total_s"],
             "cpp_total_s": cpp["meta"]["runtime"]["mean_total_s"],
         }
+        for name in ("u", "v", "w", "p", "phi_vol", "uV", "vV", "a_x", "a_y"):
+            if "kinematics" in py and name in py["kinematics"] and name in ref and name in cpp:
+                py_metrics = compare_fields(py["kinematics"][name], ref[name], name)
+                cpp_metrics = compare_fields(cpp[name], ref[name], name)
+                row[f"python_{name}_max_abs_err"] = py_metrics[f"{name}_max_abs_err"]
+                row[f"cpp_{name}_max_abs_err"] = cpp_metrics[f"{name}_max_abs_err"]
+                row[f"python_cpp_{name}_max_abs_diff"] = max_abs_between(py["kinematics"][name], cpp[name])
         rows.append(row)
 
     csv_path = out_dir / "python_cpp_matlab_summary.csv"

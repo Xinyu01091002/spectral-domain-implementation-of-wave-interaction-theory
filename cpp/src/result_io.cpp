@@ -32,6 +32,15 @@ void save_result_bundle(const std::filesystem::path& output_dir, const LoadedCas
   save_csv(output_dir / "phi.csv", result.phi);
   save_csv(output_dir / "x.csv", result.x);
   save_csv(output_dir / "y.csv", result.y);
+  save_csv(output_dir / "u.csv", result.kinematics.u);
+  save_csv(output_dir / "v.csv", result.kinematics.v);
+  save_csv(output_dir / "w.csv", result.kinematics.w);
+  save_csv(output_dir / "p.csv", result.kinematics.p);
+  save_csv(output_dir / "phi_vol.csv", result.kinematics.phi_vol);
+  save_csv(output_dir / "uV.csv", result.kinematics.uV);
+  save_csv(output_dir / "vV.csv", result.kinematics.vV);
+  save_csv(output_dir / "a_x.csv", result.kinematics.a_x);
+  save_csv(output_dir / "a_y.csv", result.kinematics.a_y);
 
   std::ofstream out(output_dir / "result.json");
   if (!out) {
@@ -55,6 +64,7 @@ void save_result_bundle(const std::filesystem::path& output_dir, const LoadedCas
       << "    \"mean_third_order_2npm_s\": " << result.runtime.mean_third_order_2npm_s << ",\n"
       << "    \"mean_third_order_npmpp_s\": " << result.runtime.mean_third_order_npmpp_s << ",\n"
       << "    \"mean_reconstruction_s\": " << result.runtime.mean_reconstruction_s << ",\n"
+      << "    \"mean_kinematics_s\": " << result.runtime.mean_kinematics_s << ",\n"
       << "    \"mean_total_s\": " << result.runtime.mean_total_s << ",\n"
       << "    \"best_total_s\": " << result.runtime.best_total_s << "\n"
       << "  },\n"

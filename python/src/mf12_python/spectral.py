@@ -194,15 +194,206 @@ def spectral_surface(coeffs: dict[str, Any], lx: float, ly: float, nx: int, ny: 
     return eta, phi_s, x_grid, y_grid
 
 
+def spectral_kinematics(
+    coeffs: dict[str, Any], lx: float, ly: float, nx: int, ny: int, z: float, t: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if not np.isscalar(z) or not np.isfinite(z):
+        raise ValueError("z must be a finite scalar for constant-z kinematics reconstruction.")
+
+    dx = lx / nx
+    dy = ly / ny
+    x_axis = np.arange(nx, dtype=np.float64) * dx
+    y_axis = np.arange(ny, dtype=np.float64) * dy
+    x_grid, y_grid = np.meshgrid(x_axis, y_axis)
+    dkx = 2.0 * np.pi / lx
+    dky = 2.0 * np.pi / ly
+    z_shift = float(z) + float(coeffs["h"])
+
+    spec_fields = {
+        "phi": np.zeros((ny, nx), dtype=np.complex128),
+        "u": np.zeros((ny, nx), dtype=np.complex128),
+        "v": np.zeros((ny, nx), dtype=np.complex128),
+        "w": np.zeros((ny, nx), dtype=np.complex128),
+        "p": np.zeros((ny, nx), dtype=np.complex128),
+    }
+
+    def accumulate_spectrum(spec: np.ndarray, k_in_x: np.ndarray, k_in_y: np.ndarray, values: np.ndarray) -> None:
+        ux_idx = np.asarray(k_in_x, dtype=np.float64).reshape(-1) / dkx
+        uy_idx = np.asarray(k_in_y, dtype=np.float64).reshape(-1) / dky
+        vals = np.asarray(values, dtype=np.complex128).reshape(-1)
+        valid = np.isfinite(ux_idx) & np.isfinite(uy_idx) & np.isfinite(vals.real) & np.isfinite(vals.imag)
+        ux_loc = ux_idx[valid]
+        uy_loc = uy_idx[valid]
+        vals_loc = vals[valid]
+        if vals_loc.size == 0:
+            return
+        ix0 = np.floor(ux_loc).astype(np.int64)
+        iy0 = np.floor(uy_loc).astype(np.int64)
+        fx = ux_loc - ix0
+        fy = uy_loc - iy0
+        np.add.at(spec, (np.mod(iy0, ny), np.mod(ix0, nx)), vals_loc * (1.0 - fx) * (1.0 - fy))
+        np.add.at(spec, (np.mod(iy0, ny), np.mod(ix0 + 1, nx)), vals_loc * fx * (1.0 - fy))
+        np.add.at(spec, (np.mod(iy0 + 1, ny), np.mod(ix0, nx)), vals_loc * (1.0 - fx) * fy)
+        np.add.at(spec, (np.mod(iy0 + 1, ny), np.mod(ix0 + 1, nx)), vals_loc * fx * fy)
+
+    def deposit_kinematics(kx_in: np.ndarray, ky_in: np.ndarray, omega_in: np.ndarray, kappa_in: np.ndarray, f_in: np.ndarray, a_in: np.ndarray, b_in: np.ndarray) -> None:
+        kxv = np.asarray(kx_in, dtype=np.float64).reshape(-1)
+        kyv = np.asarray(ky_in, dtype=np.float64).reshape(-1)
+        omegav = np.asarray(omega_in, dtype=np.float64).reshape(-1)
+        kappav = np.asarray(kappa_in, dtype=np.float64).reshape(-1)
+        fv = np.asarray(f_in, dtype=np.float64).reshape(-1)
+        av = np.asarray(a_in, dtype=np.float64).reshape(-1)
+        bv = np.asarray(b_in, dtype=np.float64).reshape(-1)
+        valid = np.isfinite(kxv) & np.isfinite(kyv) & np.isfinite(omegav) & np.isfinite(kappav) & np.isfinite(fv) & np.isfinite(av) & np.isfinite(bv)
+        kxv = kxv[valid]
+        kyv = kyv[valid]
+        omegav = omegav[valid]
+        kappav = kappav[valid]
+        fv = fv[valid]
+        av = av[valid]
+        bv = bv[valid]
+        if kxv.size == 0:
+            return
+        base = (av + 1j * bv) * np.exp(-1j * omegav * t)
+        coshz = np.cosh(kappav * z_shift)
+        sinhz = np.sinh(kappav * z_shift)
+        phi_amp = fv * coshz
+        w_amp = fv * sinhz * kappav
+        accumulate_spectrum(spec_fields["phi"], kxv, kyv, phi_amp * base * 1j)
+        accumulate_spectrum(spec_fields["u"], kxv, kyv, -kxv * phi_amp * base)
+        accumulate_spectrum(spec_fields["v"], kxv, kyv, -kyv * phi_amp * base)
+        accumulate_spectrum(spec_fields["w"], kxv, kyv, w_amp * base * 1j)
+        accumulate_spectrum(spec_fields["p"], kxv, kyv, -omegav * phi_amp * base)
+
+    deposit_kinematics(coeffs["kx"], coeffs["ky"], coeffs["omega"], coeffs["kappa"], coeffs["F"], coeffs["a"], coeffs["b"])
+
+    if "G_2" in coeffs:
+        deposit_kinematics(2.0 * coeffs["kx"], 2.0 * coeffs["ky"], 2.0 * coeffs["omega"], coeffs["kappa_2"], coeffs["F_2"], coeffs["A_2"], coeffs["B_2"])
+        deposit_kinematics(coeffs["kx_npm"], coeffs["ky_npm"], coeffs["omega_npm"], coeffs["kappa_npm"], coeffs["F_npm"], coeffs["A_npm"], coeffs["B_npm"])
+
+    if "F13" in coeffs:
+        deposit_kinematics(coeffs["kx"], coeffs["ky"], coeffs["omega"], coeffs["kappa"], coeffs["F13"], coeffs["a"], coeffs["b"])
+        deposit_kinematics(3.0 * coeffs["kx"], 3.0 * coeffs["ky"], 3.0 * coeffs["omega"], coeffs["kappa_3"], coeffs["F_3"], coeffs["A_3"], coeffs["B_3"])
+        deposit_kinematics(coeffs["kx_np2m"], coeffs["ky_np2m"], coeffs["omega_np2m"], coeffs["kappa_np2m"], coeffs["F_np2m"], coeffs["A_np2m"], coeffs["B_np2m"])
+        deposit_kinematics(coeffs["kx_2npm"], coeffs["ky_2npm"], coeffs["omega_2npm"], coeffs["kappa_2npm"], coeffs["F_2npm"], coeffs["A_2npm"], coeffs["B_2npm"])
+        deposit_kinematics(coeffs["kx_npmpp"], coeffs["ky_npmpp"], coeffs["omega_npmpp"], coeffs["kappa_npmpp"], coeffs["F_npmpp"], coeffs["A_npmpp"], coeffs["B_npmpp"])
+
+    phi_wave = np.fft.ifft2(spec_fields["phi"]).real * (nx * ny)
+    u_wave = np.fft.ifft2(spec_fields["u"]).real * (nx * ny)
+    v_wave = np.fft.ifft2(spec_fields["v"]).real * (nx * ny)
+    w = np.fft.ifft2(spec_fields["w"]).real * (nx * ny)
+    p = np.fft.ifft2(spec_fields["p"]).real * (nx * ny)
+    phi_vol = phi_wave + coeffs["Ux"] * x_grid + coeffs["Uy"] * y_grid
+    u = u_wave + coeffs["Ux"]
+    v = v_wave + coeffs["Uy"]
+
+    u_v = np.zeros((ny, nx), dtype=np.float64)
+    v_v = np.zeros((ny, nx), dtype=np.float64)
+    a_x = np.zeros((ny, nx), dtype=np.float64)
+    a_y = np.zeros((ny, nx), dtype=np.float64)
+    u_loc = np.full((ny, nx), coeffs["Ux"], dtype=np.float64)
+    v_loc = np.full((ny, nx), coeffs["Uy"], dtype=np.float64)
+    w_loc = np.zeros((ny, nx), dtype=np.float64)
+    base_speed = math.hypot(float(coeffs["Ux"]), float(coeffs["Uy"]))
+    u_v[:] = float(coeffs["Ux"]) * base_speed
+    v_v[:] = float(coeffs["Uy"]) * base_speed
+
+    def accumulate_one(omega_val: float, kx_val: float, ky_val: float, kappa_val: float, f_val: float, a_val: float, b_val: float) -> None:
+        nonlocal u_loc, v_loc, w_loc, u_v, v_v, a_x, a_y
+        if not (math.isfinite(omega_val) and math.isfinite(kx_val) and math.isfinite(ky_val) and math.isfinite(kappa_val) and math.isfinite(f_val) and math.isfinite(a_val) and math.isfinite(b_val)):
+            return
+        theta = omega_val * t - kx_val * x_grid - ky_val * y_grid
+        factor_z = f_val * math.cosh(kappa_val * z_shift)
+        phi_add = factor_z * (a_val * np.sin(theta) - b_val * np.cos(theta))
+        u_add = kx_val * factor_z * (-a_val * np.cos(theta) - b_val * np.sin(theta))
+        v_add = ky_val * factor_z * (-a_val * np.cos(theta) - b_val * np.sin(theta))
+        w_add = f_val * math.sinh(kappa_val * z_shift) * kappa_val * (a_val * np.sin(theta) - b_val * np.cos(theta))
+        p_add = -factor_z * omega_val * (a_val * np.cos(theta) + b_val * np.sin(theta))
+        vmag = np.sqrt(u_add * u_add + v_add * v_add)
+        u_v = u_v + u_add * vmag
+        v_v = v_v + v_add * vmag
+        u_loc = u_loc + u_add
+        v_loc = v_loc + v_add
+        w_loc = w_loc + w_add
+        omega_safe = omega_val if omega_val != 0.0 else np.finfo(np.float64).eps
+        t_term = math.tanh(kappa_val * z_shift) * p_add
+        u_t = kx_val * omega_val * phi_add
+        v_t = ky_val * omega_val * phi_add
+        u_x = -(kx_val * kx_val) * phi_add
+        v_x = -(kx_val * ky_val) * phi_add
+        u_y = -(kx_val * ky_val) * phi_add
+        v_y = -(ky_val * ky_val) * phi_add
+        u_z = kx_val * kappa_val / omega_safe * t_term
+        v_z = ky_val * kappa_val / omega_safe * t_term
+        a_x = a_x + u_t + u_loc * u_x + v_loc * u_y + w_loc * u_z
+        a_y = a_y + v_t + u_loc * v_x + v_loc * v_y + w_loc * v_z
+
+    for n in range(int(coeffs["N"])):
+        accumulate_one(coeffs["omega"][n], coeffs["kx"][n], coeffs["ky"][n], coeffs["kappa"][n], coeffs["F"][n], coeffs["a"][n], coeffs["b"][n])
+
+    if "G_2" in coeffs:
+        for n in range(int(coeffs["N"])):
+            accumulate_one(2.0 * coeffs["omega"][n], coeffs["kx_2"][n], coeffs["ky_2"][n], coeffs["kappa_2"][n], coeffs["F_2"][n], coeffs["A_2"][n], coeffs["B_2"][n])
+        cnm = 0
+        for n in range(int(coeffs["N"])):
+            for m in range(n + 1, int(coeffs["N"])):
+                for _pm in (1, -1):
+                    accumulate_one(coeffs["omega_npm"][cnm], coeffs["kx_npm"][cnm], coeffs["ky_npm"][cnm], coeffs["kappa_npm"][cnm], coeffs["F_npm"][cnm], coeffs["A_npm"][cnm], coeffs["B_npm"][cnm])
+                    cnm += 1
+
+    if "F13" in coeffs:
+        for n in range(int(coeffs["N"])):
+            accumulate_one(coeffs["omega"][n], coeffs["kx"][n], coeffs["ky"][n], coeffs["kappa"][n], coeffs["F13"][n], coeffs["a"][n], coeffs["b"][n])
+            accumulate_one(3.0 * coeffs["omega"][n], 3.0 * coeffs["kx"][n], 3.0 * coeffs["ky"][n], coeffs["kappa_3"][n], coeffs["F_3"][n], coeffs["A_3"][n], coeffs["B_3"][n])
+
+        if bool(coeffs.get("superharmonic_only", False)):
+            pair_idx = 0
+            for n in range(int(coeffs["N"])):
+                for m in range(n + 1, int(coeffs["N"])):
+                    accumulate_one(coeffs["omega_np2m"][pair_idx], coeffs["kx_np2m"][pair_idx], coeffs["ky_np2m"][pair_idx], coeffs["kappa_np2m"][pair_idx], coeffs["F_np2m"][pair_idx], coeffs["A_np2m"][pair_idx], coeffs["B_np2m"][pair_idx])
+                    accumulate_one(coeffs["omega_2npm"][pair_idx], coeffs["kx_2npm"][pair_idx], coeffs["ky_2npm"][pair_idx], coeffs["kappa_2npm"][pair_idx], coeffs["F_2npm"][pair_idx], coeffs["A_2npm"][pair_idx], coeffs["B_2npm"][pair_idx])
+                    pair_idx += 1
+
+            trip_idx = 0
+            for n in range(int(coeffs["N"])):
+                for m in range(n + 1, int(coeffs["N"])):
+                    for q in range(m + 1, int(coeffs["N"])):
+                        accumulate_one(coeffs["omega_npmpp"][trip_idx], coeffs["kx_npmpp"][trip_idx], coeffs["ky_npmpp"][trip_idx], coeffs["kappa_npmpp"][trip_idx], coeffs["F_npmpp"][trip_idx], coeffs["A_npmpp"][trip_idx], coeffs["B_npmpp"][trip_idx])
+                        trip_idx += 1
+        else:
+            cnm = 0
+            for n in range(int(coeffs["N"])):
+                for m in range(n + 1, int(coeffs["N"])):
+                    for _pm in (1, -1):
+                        accumulate_one(coeffs["omega_np2m"][cnm], coeffs["kx_np2m"][cnm], coeffs["ky_np2m"][cnm], coeffs["kappa_np2m"][cnm], coeffs["F_np2m"][cnm], coeffs["A_np2m"][cnm], coeffs["B_np2m"][cnm])
+                        accumulate_one(coeffs["omega_2npm"][cnm], coeffs["kx_2npm"][cnm], coeffs["ky_2npm"][cnm], coeffs["kappa_2npm"][cnm], coeffs["F_2npm"][cnm], coeffs["A_2npm"][cnm], coeffs["B_2npm"][cnm])
+                        cnm += 1
+
+            c3 = 0
+            for n in range(int(coeffs["N"])):
+                for m in range(n + 1, int(coeffs["N"])):
+                    for _pmm in (1, -1):
+                        for q in range(m + 1, int(coeffs["N"])):
+                            for _pmp in (1, -1):
+                                accumulate_one(coeffs["omega_npmpp"][c3], coeffs["kx_npmpp"][c3], coeffs["ky_npmpp"][c3], coeffs["kappa_npmpp"][c3], coeffs["F_npmpp"][c3], coeffs["A_npmpp"][c3], coeffs["B_npmpp"][c3])
+                                c3 += 1
+
+    return u, v, w, p, phi_vol, u_v, v_v, a_x, a_y, x_grid, y_grid
+
+
 def run_case(case: dict[str, Any], repeats: int = 1, warmup: bool = False) -> dict[str, Any]:
     inputs = case["inputs"]
     arrays = case["arrays"]
     coeff_times: list[float] = []
     recon_times: list[float] = []
+    kin_times: list[float] = []
     if warmup:
         coeffs = spectral_coefficients(inputs["order"], inputs["g"], inputs["h"], arrays["a"], arrays["b"], arrays["kx"], arrays["ky"], inputs["Ux"], inputs["Uy"], {"enable_subharmonic": False})
         spectral_surface(coeffs, inputs["Lx"], inputs["Ly"], inputs["Nx"], inputs["Ny"], inputs["t"])
+        if "z_kinematics" in inputs:
+            spectral_kinematics(coeffs, inputs["Lx"], inputs["Ly"], inputs["Nx"], inputs["Ny"], inputs["z_kinematics"], inputs["t"])
     eta = phi = x_grid = y_grid = None
+    kin_result: dict[str, np.ndarray] | None = None
     for _ in range(repeats):
         t0 = time.perf_counter()
         coeffs = spectral_coefficients(inputs["order"], inputs["g"], inputs["h"], arrays["a"], arrays["b"], arrays["kx"], arrays["ky"], inputs["Ux"], inputs["Uy"], {"enable_subharmonic": False})
@@ -210,21 +401,39 @@ def run_case(case: dict[str, Any], repeats: int = 1, warmup: bool = False) -> di
         t1 = time.perf_counter()
         eta, phi, x_grid, y_grid = spectral_surface(coeffs, inputs["Lx"], inputs["Ly"], inputs["Nx"], inputs["Ny"], inputs["t"])
         recon_times.append(time.perf_counter() - t1)
+        if "z_kinematics" in inputs:
+            t2 = time.perf_counter()
+            u, v, w, p, phi_vol, u_v, v_v, a_x, a_y, _xg, _yg = spectral_kinematics(coeffs, inputs["Lx"], inputs["Ly"], inputs["Nx"], inputs["Ny"], inputs["z_kinematics"], inputs["t"])
+            kin_times.append(time.perf_counter() - t2)
+            kin_result = {
+                "u": u,
+                "v": v,
+                "w": w,
+                "p": p,
+                "phi_vol": phi_vol,
+                "uV": u_v,
+                "vV": v_v,
+                "a_x": a_x,
+                "a_y": a_y,
+            }
     return {
         "eta": eta,
         "phi": phi,
         "x": x_grid[0, :],
         "y": y_grid[:, 0],
+        **({"kinematics": kin_result} if kin_result is not None else {}),
         "runtime": {
             "repeats": repeats,
             "warmup": warmup,
             "coefficient_s": coeff_times,
             "reconstruction_s": recon_times,
-            "total_s": [c + r for c, r in zip(coeff_times, recon_times)],
+            "kinematics_s": kin_times,
+            "total_s": [c + r + (kin_times[i] if i < len(kin_times) else 0.0) for i, (c, r) in enumerate(zip(coeff_times, recon_times))],
             "mean_coefficient_s": float(np.mean(coeff_times)),
             "mean_reconstruction_s": float(np.mean(recon_times)),
-            "mean_total_s": float(np.mean(np.asarray(coeff_times) + np.asarray(recon_times))),
-            "best_total_s": float(np.min(np.asarray(coeff_times) + np.asarray(recon_times))),
+            "mean_kinematics_s": float(np.mean(kin_times)) if kin_times else 0.0,
+            "mean_total_s": float(np.mean(np.asarray(coeff_times) + np.asarray(recon_times) + (np.asarray(kin_times) if kin_times else 0.0))),
+            "best_total_s": float(np.min(np.asarray(coeff_times) + np.asarray(recon_times) + (np.asarray(kin_times) if kin_times else 0.0))),
         },
         "metadata": runtime_metadata(),
     }

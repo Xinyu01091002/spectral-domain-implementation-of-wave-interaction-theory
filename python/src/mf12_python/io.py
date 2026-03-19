@@ -44,6 +44,9 @@ def save_result_bundle(output_dir: str | Path, result: dict[str, Any]) -> None:
     np.savetxt(out / "phi.csv", np.asarray(result["phi"]), delimiter=",")
     np.savetxt(out / "x.csv", np.asarray(result["x"]).reshape(-1, 1), delimiter=",")
     np.savetxt(out / "y.csv", np.asarray(result["y"]).reshape(-1, 1), delimiter=",")
+    if "kinematics" in result:
+        for name, values in result["kinematics"].items():
+            np.savetxt(out / f"{name}.csv", np.asarray(values), delimiter=",")
     metadata = {
         "runtime": result.get("runtime", {}),
         "metadata": result.get("metadata", {}),

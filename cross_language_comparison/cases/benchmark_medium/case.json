@@ -13,6 +13,7 @@
     "Nx": 64,
     "Ny": 64,
     "t": 0,
+    "z_kinematics": -30,
     "subharmonic_mode": "skip"
   },
   "arrays": {
@@ -26,7 +27,16 @@
       "eta": "reference\\matlab\\eta.csv",
       "phi": "reference\\matlab\\phi.csv",
       "x": "reference\\matlab\\x.csv",
-      "y": "reference\\matlab\\y.csv"
+      "y": "reference\\matlab\\y.csv",
+      "u": "reference\\matlab\\u.csv",
+      "v": "reference\\matlab\\v.csv",
+      "w": "reference\\matlab\\w.csv",
+      "p": "reference\\matlab\\p.csv",
+      "phi_vol": "reference\\matlab\\phi_vol.csv",
+      "uV": "reference\\matlab\\uV.csv",
+      "vV": "reference\\matlab\\vV.csv",
+      "a_x": "reference\\matlab\\a_x.csv",
+      "a_y": "reference\\matlab\\a_y.csv"
     },
     "metadata": "reference\\matlab\\result.json"
   },
@@ -36,6 +46,15 @@
     "eta_rms_err": 1E-7,
     "phi_rms_err": 1E-7,
     "eta_relative_l2_err": 1E-6,
-    "phi_relative_l2_err": 1E-6
+    "phi_relative_l2_err": 1E-6,
+    "u_max_abs_err": 1E-6,
+    "v_max_abs_err": 1E-6,
+    "w_max_abs_err": 1E-6,
+    "p_max_abs_err": 1E-6,
+    "phi_vol_max_abs_err": 1E-6,
+    "uV_max_abs_err": 1E-6,
+    "vV_max_abs_err": 1E-6,
+    "a_x_max_abs_err": 1E-6,
+    "a_y_max_abs_err": 1E-6
   }
 }

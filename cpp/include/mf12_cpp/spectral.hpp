@@ -20,8 +20,21 @@ struct RuntimeStats {
   double mean_third_order_2npm_s = 0.0;
   double mean_third_order_npmpp_s = 0.0;
   double mean_reconstruction_s = 0.0;
+  double mean_kinematics_s = 0.0;
   double mean_total_s = 0.0;
   double best_total_s = 0.0;
+};
+
+struct KinematicsBundle {
+  Matrix u;
+  Matrix v;
+  Matrix w;
+  Matrix p;
+  Matrix phi_vol;
+  Matrix uV;
+  Matrix vV;
+  Matrix a_x;
+  Matrix a_y;
 };
 
 struct ResultBundle {
@@ -29,6 +42,7 @@ struct ResultBundle {
   Matrix phi;
   Matrix x;
   Matrix y;
+  KinematicsBundle kinematics;
   RuntimeStats runtime;
   std::map<std::string, double> comparison;
 };

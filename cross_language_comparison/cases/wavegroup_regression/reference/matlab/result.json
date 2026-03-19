@@ -2,15 +2,16 @@
   "case_id": "wavegroup_regression",
   "runtime": {
     "repeats": 1,
-    "mean_coefficient_s": 0.0716529,
-    "mean_reconstruction_s": 0.0200336,
-    "mean_total_s": 0.0916865,
-    "best_total_s": 0.0916865
+    "mean_coefficient_s": 0.0695476,
+    "mean_reconstruction_s": 0.0228683,
+    "mean_kinematics_s": 2.6138152,
+    "mean_total_s": 2.7062311,
+    "best_total_s": 2.7062311
   },
   "metadata": {
     "language": "matlab",
     "matlab_version": "9.13.0.2698988 (R2022b) Update 10",
     "fft_backend": "MATLAB ifft2",
-    "implementation": "mf12_spectral_coefficients + mf12_spectral_surface"
+    "implementation": "mf12_spectral_coefficients + mf12_spectral_surface + mf12_spectral_kinematics"
   }
 }

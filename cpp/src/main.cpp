@@ -51,6 +51,7 @@ int run_inspect(const std::filesystem::path& case_dir) {
             << "  \"purpose\": \"" << loaded.manifest.purpose << "\",\n"
             << "  \"grid\": {\"Nx\": " << inp.Nx << ", \"Ny\": " << inp.Ny << "},\n"
             << "  \"domain\": {\"Lx\": " << inp.Lx << ", \"Ly\": " << inp.Ly << "},\n"
+            << "  \"z_kinematics\": " << inp.z_kinematics << ",\n"
             << "  \"order\": " << inp.order << ",\n"
             << "  \"component_count\": " << n_components << ",\n"
             << "  \"subharmonic_mode\": \"" << inp.subharmonic_mode << "\",\n"
@@ -77,7 +78,7 @@ int run_verify(const std::filesystem::path& case_dir, const std::filesystem::pat
     loaded.manifest.inputs.order = override_order;
   }
   auto result = mf12_cpp::run_case(loaded, 1, false);
-  result.comparison = mf12_cpp::compare_result_to_reference(result.eta, result.phi, loaded);
+  result.comparison = mf12_cpp::compare_result_to_reference(result, loaded);
   mf12_cpp::save_result_bundle(output_dir, loaded, result);
   const bool pass = mf12_cpp::tolerances_pass(result.comparison, loaded.manifest.tolerances);
   std::cout << "{\n"
@@ -129,6 +130,7 @@ int run_benchmark(const std::filesystem::path& case_dir, int repeats, bool warmu
             << "    \"mean_third_order_2npm_s\": " << std::setprecision(17) << result.runtime.mean_third_order_2npm_s << ",\n"
             << "    \"mean_third_order_npmpp_s\": " << std::setprecision(17) << result.runtime.mean_third_order_npmpp_s << ",\n"
             << "    \"mean_reconstruction_s\": " << std::setprecision(17) << result.runtime.mean_reconstruction_s << ",\n"
+            << "    \"mean_kinematics_s\": " << std::setprecision(17) << result.runtime.mean_kinematics_s << ",\n"
             << "    \"mean_total_s\": " << std::setprecision(17) << result.runtime.mean_total_s << ",\n"
             << "    \"best_total_s\": " << std::setprecision(17) << result.runtime.best_total_s << "\n"
             << "  }\n"

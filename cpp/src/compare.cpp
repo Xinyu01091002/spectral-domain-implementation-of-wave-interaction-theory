@@ -51,6 +51,27 @@ std::map<std::string, double> compare_result_to_reference(const Matrix& eta, con
   return metrics;
 }
 
+std::map<std::string, double> compare_result_to_reference(const ResultBundle& result, const LoadedCase& loaded) {
+  auto metrics = compare_result_to_reference(result.eta, result.phi, loaded);
+  const auto add_if_present = [&](const Matrix& candidate, const std::string& name) {
+    const auto it = loaded.reference_arrays.find(name);
+    if (it != loaded.reference_arrays.end()) {
+      const auto field_metrics = compare_fields(candidate, it->second, name);
+      metrics.insert(field_metrics.begin(), field_metrics.end());
+    }
+  };
+  add_if_present(result.kinematics.u, "u");
+  add_if_present(result.kinematics.v, "v");
+  add_if_present(result.kinematics.w, "w");
+  add_if_present(result.kinematics.p, "p");
+  add_if_present(result.kinematics.phi_vol, "phi_vol");
+  add_if_present(result.kinematics.uV, "uV");
+  add_if_present(result.kinematics.vV, "vV");
+  add_if_present(result.kinematics.a_x, "a_x");
+  add_if_present(result.kinematics.a_y, "a_y");
+  return metrics;
+}
+
 bool tolerances_pass(const std::map<std::string, double>& metrics, const std::map<std::string, double>& tolerances) {
   for (const auto& [key, limit] : tolerances) {
     const auto it = metrics.find(key);

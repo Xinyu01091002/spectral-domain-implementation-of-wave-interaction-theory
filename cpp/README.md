@@ -1,6 +1,6 @@
 # C++ Port
 
-This directory contains the C++ spectral MF12 implementation and CLI.
+This directory contains the C++ spectral MF12 implementation and CLI, including constant-z kinematics reconstruction.
 
 The C++ port uses the same shared-case format as the Python tools and treats the archived MATLAB outputs under `cross_language_comparison/cases/` as the numerical ground truth.
 
@@ -26,7 +26,7 @@ The CLI entry point is `cpp/build/mf12_cpp.exe` on Windows and `cpp/build/mf12_c
 - the current port is spectral-only
 - order `<= 3` is verified against the shared MATLAB reference cases
 - `minimal_small`, `wavegroup_regression`, and `benchmark_medium` pass against MATLAB reference outputs
-- MATLAB, Python, and C++ agree to machine precision on the shared spectral regression cases
+- MATLAB, Python, and C++ agree to machine precision on the shared spectral regression cases for both surface fields and constant-z kinematics
 - reconstruction prefers FFTW3 when available and otherwise falls back to the in-repo radix-2 inverse FFT path for power-of-two grids, with a direct inverse-DFT fallback for other sizes
 - third-order coefficient profiling separates `np2m`, `2npm`, and `npmpp`, and the `npmpp` hotspot can use optional OpenMP parallelization
 
@@ -122,6 +122,11 @@ cpp/build/mf12_cpp.exe validate cross_language_comparison/cases/minimal_small
 cpp/build/mf12_cpp.exe benchmark cross_language_comparison/cases/benchmark_medium 3 1
 cpp/build/mf12_cpp.exe dump-coeffs cross_language_comparison/cases/wavegroup_regression outputs/cross_language_comparison/dump_coeffs/wavegroup_regression 3
 ```
+
+Verification outputs now include:
+
+- surface fields: `eta.csv`, `phi.csv`
+- constant-z kinematics: `u.csv`, `v.csv`, `w.csv`, `p.csv`, `phi_vol.csv`, `uV.csv`, `vV.csv`, `a_x.csv`, `a_y.csv`
 
 ## Optional Acceleration
 

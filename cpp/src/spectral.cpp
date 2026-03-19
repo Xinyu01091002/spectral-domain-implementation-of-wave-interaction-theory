@@ -105,6 +105,18 @@ struct SurfaceFields {
   Matrix y;
 };
 
+struct KinematicsFields {
+  Matrix u;
+  Matrix v;
+  Matrix w;
+  Matrix p;
+  Matrix phi_vol;
+  Matrix uV;
+  Matrix vV;
+  Matrix a_x;
+  Matrix a_y;
+};
+
 struct CoefficientBuildStats {
   double linear_s = 0.0;
   double second_order_s = 0.0;
@@ -1088,6 +1100,206 @@ SurfaceFields reconstruct_surface(const SpectralCoefficients& coeffs, const Case
   return fields;
 }
 
+KinematicsFields reconstruct_kinematics(const SpectralCoefficients& coeffs, const CaseInputs& inp) {
+  const int nx = inp.Nx;
+  const int ny = inp.Ny;
+  const double dx = inp.Lx / static_cast<double>(nx);
+  const double dy = inp.Ly / static_cast<double>(ny);
+  const double dkx = 2.0 * kPi / inp.Lx;
+  const double dky = 2.0 * kPi / inp.Ly;
+  const double z_shift = inp.z_kinematics + inp.h;
+
+  auto make_grid = [&](double fill = 0.0) {
+    Matrix mat;
+    mat.rows = static_cast<std::size_t>(ny);
+    mat.cols = static_cast<std::size_t>(nx);
+    mat.values.assign(static_cast<std::size_t>(nx * ny), fill);
+    return mat;
+  };
+  auto add_scaled = [&](Matrix& out, const Matrix& add, double scale = 1.0) {
+    for (std::size_t i = 0; i < out.values.size(); ++i) {
+      out.values[i] += scale * add.values[i];
+    }
+  };
+  auto multiply_pointwise = [&](const Matrix& a, const Matrix& b) {
+    Matrix out = make_grid();
+    for (std::size_t i = 0; i < out.values.size(); ++i) {
+      out.values[i] = a.values[i] * b.values[i];
+    }
+    return out;
+  };
+  auto make_theta_field = [&](double omega, double kx, double ky) {
+    Matrix theta = make_grid();
+    for (int iy = 0; iy < ny; ++iy) {
+      const double y = dy * static_cast<double>(iy);
+      for (int ix = 0; ix < nx; ++ix) {
+        const double x = dx * static_cast<double>(ix);
+        theta.values[static_cast<std::size_t>(iy * nx + ix)] = omega * inp.t - kx * x - ky * y;
+      }
+    }
+    return theta;
+  };
+
+  std::vector<std::complex<double>> spec_phi(static_cast<std::size_t>(nx * ny), std::complex<double>(0.0, 0.0));
+  std::vector<std::complex<double>> spec_u(static_cast<std::size_t>(nx * ny), std::complex<double>(0.0, 0.0));
+  std::vector<std::complex<double>> spec_v(static_cast<std::size_t>(nx * ny), std::complex<double>(0.0, 0.0));
+  std::vector<std::complex<double>> spec_w(static_cast<std::size_t>(nx * ny), std::complex<double>(0.0, 0.0));
+  std::vector<std::complex<double>> spec_p(static_cast<std::size_t>(nx * ny), std::complex<double>(0.0, 0.0));
+
+  const auto deposit_branch = [&](const std::vector<double>& kx_branch, const std::vector<double>& ky_branch, const std::vector<double>& omega_branch, const std::vector<double>& kappa_branch, const std::vector<double>& f_branch, const std::vector<double>& a_branch, const std::vector<double>& b_branch) {
+    const std::size_t len = a_branch.size();
+    std::vector<std::complex<double>> phi_vals(len);
+    std::vector<std::complex<double>> u_vals(len);
+    std::vector<std::complex<double>> v_vals(len);
+    std::vector<std::complex<double>> w_vals(len);
+    std::vector<std::complex<double>> p_vals(len);
+    for (std::size_t i = 0; i < len; ++i) {
+      const std::complex<double> amp(a_branch[i], b_branch[i]);
+      const std::complex<double> base = amp * std::exp(std::complex<double>(0.0, -omega_branch[i] * inp.t));
+      const double cosh_z = std::cosh(kappa_branch[i] * z_shift);
+      const double sinh_z = std::sinh(kappa_branch[i] * z_shift);
+      const double phi_amp = f_branch[i] * cosh_z;
+      const double w_amp = f_branch[i] * sinh_z * kappa_branch[i];
+      phi_vals[i] = base * std::complex<double>(0.0, phi_amp);
+      u_vals[i] = base * (-kx_branch[i] * phi_amp);
+      v_vals[i] = base * (-ky_branch[i] * phi_amp);
+      w_vals[i] = base * std::complex<double>(0.0, w_amp);
+      p_vals[i] = base * (-omega_branch[i] * phi_amp);
+    }
+    accumulate_spectrum(spec_phi, nx, ny, dkx, dky, kx_branch, ky_branch, phi_vals);
+    accumulate_spectrum(spec_u, nx, ny, dkx, dky, kx_branch, ky_branch, u_vals);
+    accumulate_spectrum(spec_v, nx, ny, dkx, dky, kx_branch, ky_branch, v_vals);
+    accumulate_spectrum(spec_w, nx, ny, dkx, dky, kx_branch, ky_branch, w_vals);
+    accumulate_spectrum(spec_p, nx, ny, dkx, dky, kx_branch, ky_branch, p_vals);
+  };
+
+  deposit_branch(coeffs.kx, coeffs.ky, coeffs.omega, coeffs.kappa, coeffs.f, coeffs.a, coeffs.b);
+  if (coeffs.order >= 2) {
+    std::vector<double> kappa2(coeffs.kappa.size(), 0.0);
+    std::vector<double> kappa_npm(coeffs.kx_npm.size(), 0.0);
+    for (std::size_t i = 0; i < coeffs.kappa.size(); ++i) kappa2[i] = 2.0 * coeffs.kappa[i];
+    for (std::size_t i = 0; i < kappa_npm.size(); ++i) kappa_npm[i] = std::hypot(coeffs.kx_npm[i], coeffs.ky_npm[i]);
+    deposit_branch(coeffs.kx2, coeffs.ky2, coeffs.omega2, kappa2, coeffs.f2, coeffs.a2, coeffs.b2);
+    deposit_branch(coeffs.kx_npm, coeffs.ky_npm, coeffs.omega_npm, kappa_npm, coeffs.f_npm, coeffs.a_npm, coeffs.b_npm);
+    if (coeffs.order >= 3) {
+      std::vector<double> kappa3(coeffs.kappa.size(), 0.0);
+      std::vector<double> kappa_np2m(coeffs.kx_np2m.size(), 0.0);
+      std::vector<double> kappa_2npm(coeffs.kx_2npm.size(), 0.0);
+      std::vector<double> kappa_npmpp(coeffs.kx_npmpp.size(), 0.0);
+      for (std::size_t i = 0; i < coeffs.kappa.size(); ++i) kappa3[i] = 3.0 * coeffs.kappa[i];
+      for (std::size_t i = 0; i < kappa_np2m.size(); ++i) kappa_np2m[i] = std::hypot(coeffs.kx_np2m[i], coeffs.ky_np2m[i]);
+      for (std::size_t i = 0; i < kappa_2npm.size(); ++i) kappa_2npm[i] = std::hypot(coeffs.kx_2npm[i], coeffs.ky_2npm[i]);
+      for (std::size_t i = 0; i < kappa_npmpp.size(); ++i) kappa_npmpp[i] = std::hypot(coeffs.kx_npmpp[i], coeffs.ky_npmpp[i]);
+      deposit_branch(coeffs.kx, coeffs.ky, coeffs.omega, coeffs.kappa, coeffs.f13, coeffs.a, coeffs.b);
+      deposit_branch(coeffs.kx3, coeffs.ky3, coeffs.omega3v, kappa3, coeffs.f3, coeffs.a3, coeffs.b3);
+      deposit_branch(coeffs.kx_np2m, coeffs.ky_np2m, coeffs.omega_np2m, kappa_np2m, coeffs.f_np2m, coeffs.a_np2m, coeffs.b_np2m);
+      deposit_branch(coeffs.kx_2npm, coeffs.ky_2npm, coeffs.omega_2npm, kappa_2npm, coeffs.f_2npm, coeffs.a_2npm, coeffs.b_2npm);
+      deposit_branch(coeffs.kx_npmpp, coeffs.ky_npmpp, coeffs.omega_npmpp, kappa_npmpp, coeffs.f_npmpp, coeffs.a_npmpp, coeffs.b_npmpp);
+    }
+  }
+
+  KinematicsFields fields;
+  fields.phi_vol = inverse_fft2_unscaled(spec_phi, nx, ny);
+  fields.u = inverse_fft2_unscaled(spec_u, nx, ny);
+  fields.v = inverse_fft2_unscaled(spec_v, nx, ny);
+  fields.w = inverse_fft2_unscaled(spec_w, nx, ny);
+  fields.p = inverse_fft2_unscaled(spec_p, nx, ny);
+  fields.uV = make_grid();
+  fields.vV = make_grid();
+  fields.a_x = make_grid();
+  fields.a_y = make_grid();
+
+  for (int iy = 0; iy < ny; ++iy) {
+    const double y = dy * static_cast<double>(iy);
+    for (int ix = 0; ix < nx; ++ix) {
+      const double x = dx * static_cast<double>(ix);
+      const std::size_t idx = static_cast<std::size_t>(iy * nx + ix);
+      fields.phi_vol.values[idx] += coeffs.Ux * x + coeffs.Uy * y;
+      fields.u.values[idx] += coeffs.Ux;
+      fields.v.values[idx] += coeffs.Uy;
+    }
+  }
+
+  Matrix u_loc = make_grid(coeffs.Ux);
+  Matrix v_loc = make_grid(coeffs.Uy);
+  Matrix w_loc = make_grid();
+  const double base_speed = std::hypot(coeffs.Ux, coeffs.Uy);
+  for (std::size_t i = 0; i < fields.uV.values.size(); ++i) {
+    fields.uV.values[i] = coeffs.Ux * base_speed;
+    fields.vV.values[i] = coeffs.Uy * base_speed;
+  }
+
+  const auto accumulate_one = [&](double omega, double kx, double ky, double kappa, double f, double a, double b) {
+    Matrix theta = make_theta_field(omega, kx, ky);
+    Matrix phi_add = make_grid();
+    Matrix u_add = make_grid();
+    Matrix v_add = make_grid();
+    Matrix w_add = make_grid();
+    Matrix p_add = make_grid();
+    const double factor_z = f * std::cosh(kappa * z_shift);
+    const double w_factor = f * std::sinh(kappa * z_shift) * kappa;
+    for (std::size_t i = 0; i < theta.values.size(); ++i) {
+      const double s = std::sin(theta.values[i]);
+      const double c = std::cos(theta.values[i]);
+      phi_add.values[i] = factor_z * (a * s - b * c);
+      u_add.values[i] = kx * factor_z * (-a * c - b * s);
+      v_add.values[i] = ky * factor_z * (-a * c - b * s);
+      w_add.values[i] = w_factor * (a * s - b * c);
+      p_add.values[i] = -factor_z * omega * (a * c + b * s);
+      const double vmag = std::hypot(u_add.values[i], v_add.values[i]);
+      fields.uV.values[i] += u_add.values[i] * vmag;
+      fields.vV.values[i] += v_add.values[i] * vmag;
+      u_loc.values[i] += u_add.values[i];
+      v_loc.values[i] += v_add.values[i];
+      w_loc.values[i] += w_add.values[i];
+    }
+    const double omega_safe = (omega == 0.0) ? std::numeric_limits<double>::epsilon() : omega;
+    const double tanh_kz = std::tanh(kappa * z_shift);
+    for (std::size_t i = 0; i < theta.values.size(); ++i) {
+      const double u_t = kx * omega * phi_add.values[i];
+      const double v_t = ky * omega * phi_add.values[i];
+      const double u_x = -(kx * kx) * phi_add.values[i];
+      const double v_x = -(kx * ky) * phi_add.values[i];
+      const double u_y = -(kx * ky) * phi_add.values[i];
+      const double v_y = -(ky * ky) * phi_add.values[i];
+      const double t_term = tanh_kz * p_add.values[i];
+      const double u_z = kx * kappa / omega_safe * t_term;
+      const double v_z = ky * kappa / omega_safe * t_term;
+      fields.a_x.values[i] += u_t + u_loc.values[i] * u_x + v_loc.values[i] * u_y + w_loc.values[i] * u_z;
+      fields.a_y.values[i] += v_t + u_loc.values[i] * v_x + v_loc.values[i] * v_y + w_loc.values[i] * v_z;
+    }
+  };
+
+  for (int n = 0; n < coeffs.n_comp; ++n) {
+    accumulate_one(coeffs.omega[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.f[n], coeffs.a[n], coeffs.b[n]);
+  }
+  if (coeffs.order >= 2) {
+    std::vector<double> kappa_npm(coeffs.kx_npm.size(), 0.0);
+    for (std::size_t i = 0; i < kappa_npm.size(); ++i) kappa_npm[i] = std::hypot(coeffs.kx_npm[i], coeffs.ky_npm[i]);
+    for (int n = 0; n < coeffs.n_comp; ++n) {
+      accumulate_one(coeffs.omega2[n], coeffs.kx2[n], coeffs.ky2[n], 2.0 * coeffs.kappa[n], coeffs.f2[n], coeffs.a2[n], coeffs.b2[n]);
+    }
+    for (std::size_t i = 0; i < coeffs.kx_npm.size(); ++i) {
+      accumulate_one(coeffs.omega_npm[i], coeffs.kx_npm[i], coeffs.ky_npm[i], kappa_npm[i], coeffs.f_npm[i], coeffs.a_npm[i], coeffs.b_npm[i]);
+    }
+    if (coeffs.order >= 3) {
+      for (int n = 0; n < coeffs.n_comp; ++n) {
+        accumulate_one(coeffs.omega[n], coeffs.kx[n], coeffs.ky[n], coeffs.kappa[n], coeffs.f13[n], coeffs.a[n], coeffs.b[n]);
+        accumulate_one(coeffs.omega3v[n], coeffs.kx3[n], coeffs.ky3[n], 3.0 * coeffs.kappa[n], coeffs.f3[n], coeffs.a3[n], coeffs.b3[n]);
+      }
+      for (std::size_t i = 0; i < coeffs.kx_np2m.size(); ++i) {
+        accumulate_one(coeffs.omega_np2m[i], coeffs.kx_np2m[i], coeffs.ky_np2m[i], std::hypot(coeffs.kx_np2m[i], coeffs.ky_np2m[i]), coeffs.f_np2m[i], coeffs.a_np2m[i], coeffs.b_np2m[i]);
+        accumulate_one(coeffs.omega_2npm[i], coeffs.kx_2npm[i], coeffs.ky_2npm[i], std::hypot(coeffs.kx_2npm[i], coeffs.ky_2npm[i]), coeffs.f_2npm[i], coeffs.a_2npm[i], coeffs.b_2npm[i]);
+      }
+      for (std::size_t i = 0; i < coeffs.kx_npmpp.size(); ++i) {
+        accumulate_one(coeffs.omega_npmpp[i], coeffs.kx_npmpp[i], coeffs.ky_npmpp[i], std::hypot(coeffs.kx_npmpp[i], coeffs.ky_npmpp[i]), coeffs.f_npmpp[i], coeffs.a_npmpp[i], coeffs.b_npmpp[i]);
+      }
+    }
+  }
+
+  return fields;
+}
+
 }  // namespace
 
 ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
@@ -1108,13 +1320,17 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
   std::vector<double> coeff_third_order_2npm_times;
   std::vector<double> coeff_third_order_npmpp_times;
   std::vector<double> recon_times;
+  std::vector<double> kin_times;
   SurfaceFields fields;
+  KinematicsFields kin_fields;
   for (int i = 0; i < repeats; ++i) {
     const auto t0 = std::chrono::steady_clock::now();
     const auto built = compute_coefficients(loaded);
     const auto t1 = std::chrono::steady_clock::now();
     fields = reconstruct_surface(built.coeffs, loaded.manifest.inputs);
     const auto t2 = std::chrono::steady_clock::now();
+    kin_fields = reconstruct_kinematics(built.coeffs, loaded.manifest.inputs);
+    const auto t3 = std::chrono::steady_clock::now();
     coeff_times.push_back(std::chrono::duration<double>(t1 - t0).count());
     coeff_linear_times.push_back(built.stats.linear_s);
     coeff_second_order_times.push_back(built.stats.second_order_s);
@@ -1123,6 +1339,7 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
     coeff_third_order_2npm_times.push_back(built.stats.third_order_2npm_s);
     coeff_third_order_npmpp_times.push_back(built.stats.third_order_npmpp_s);
     recon_times.push_back(std::chrono::duration<double>(t2 - t1).count());
+    kin_times.push_back(std::chrono::duration<double>(t3 - t2).count());
   }
 
   ResultBundle result;
@@ -1130,6 +1347,15 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
   result.phi = fields.phi;
   result.x = fields.x;
   result.y = fields.y;
+  result.kinematics.u = kin_fields.u;
+  result.kinematics.v = kin_fields.v;
+  result.kinematics.w = kin_fields.w;
+  result.kinematics.p = kin_fields.p;
+  result.kinematics.phi_vol = kin_fields.phi_vol;
+  result.kinematics.uV = kin_fields.uV;
+  result.kinematics.vV = kin_fields.vV;
+  result.kinematics.a_x = kin_fields.a_x;
+  result.kinematics.a_y = kin_fields.a_y;
   result.runtime.repeats = repeats;
   result.runtime.warmup = warmup;
   double coeff_sum = 0.0;
@@ -1140,6 +1366,7 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
   double coeff_third_order_2npm_sum = 0.0;
   double coeff_third_order_npmpp_sum = 0.0;
   double recon_sum = 0.0;
+  double kin_sum = 0.0;
   result.runtime.best_total_s = std::numeric_limits<double>::max();
   for (std::size_t i = 0; i < coeff_times.size(); ++i) {
     coeff_sum += coeff_times[i];
@@ -1150,7 +1377,8 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
     coeff_third_order_2npm_sum += coeff_third_order_2npm_times[i];
     coeff_third_order_npmpp_sum += coeff_third_order_npmpp_times[i];
     recon_sum += recon_times[i];
-    result.runtime.best_total_s = std::min(result.runtime.best_total_s, coeff_times[i] + recon_times[i]);
+    kin_sum += kin_times[i];
+    result.runtime.best_total_s = std::min(result.runtime.best_total_s, coeff_times[i] + recon_times[i] + kin_times[i]);
   }
   result.runtime.mean_coefficient_s = coeff_sum / static_cast<double>(coeff_times.size());
   result.runtime.mean_linear_coefficient_s = coeff_linear_sum / static_cast<double>(coeff_linear_times.size());
@@ -1160,7 +1388,8 @@ ResultBundle run_case(const LoadedCase& loaded, int repeats, bool warmup) {
   result.runtime.mean_third_order_2npm_s = coeff_third_order_2npm_sum / static_cast<double>(coeff_third_order_2npm_times.size());
   result.runtime.mean_third_order_npmpp_s = coeff_third_order_npmpp_sum / static_cast<double>(coeff_third_order_npmpp_times.size());
   result.runtime.mean_reconstruction_s = recon_sum / static_cast<double>(recon_times.size());
-  result.runtime.mean_total_s = result.runtime.mean_coefficient_s + result.runtime.mean_reconstruction_s;
+  result.runtime.mean_kinematics_s = kin_sum / static_cast<double>(kin_times.size());
+  result.runtime.mean_total_s = result.runtime.mean_coefficient_s + result.runtime.mean_reconstruction_s + result.runtime.mean_kinematics_s;
   return result;
 }
 

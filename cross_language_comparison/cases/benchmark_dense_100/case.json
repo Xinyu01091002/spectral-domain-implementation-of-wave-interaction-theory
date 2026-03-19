@@ -1,0 +1,60 @@
+{
+  "case_id": "benchmark_dense_100",
+  "description": "Dense deterministic benchmark case for cross-language speed sweeps with up to 100 retained components.",
+  "purpose": "benchmark",
+  "inputs": {
+    "order": 3,
+    "g": 9.81,
+    "h": 150,
+    "Ux": 0,
+    "Uy": 0,
+    "Lx": 3000,
+    "Ly": 3000,
+    "Nx": 64,
+    "Ny": 64,
+    "t": 0,
+    "z_kinematics": -30,
+    "subharmonic_mode": "skip"
+  },
+  "arrays": {
+    "a": "inputs\\a.csv",
+    "b": "inputs\\b.csv",
+    "kx": "inputs\\kx.csv",
+    "ky": "inputs\\ky.csv"
+  },
+  "reference": {
+    "arrays": {
+      "eta": "reference\\matlab\\eta.csv",
+      "phi": "reference\\matlab\\phi.csv",
+      "x": "reference\\matlab\\x.csv",
+      "y": "reference\\matlab\\y.csv",
+      "u": "reference\\matlab\\u.csv",
+      "v": "reference\\matlab\\v.csv",
+      "w": "reference\\matlab\\w.csv",
+      "p": "reference\\matlab\\p.csv",
+      "phi_vol": "reference\\matlab\\phi_vol.csv",
+      "uV": "reference\\matlab\\uV.csv",
+      "vV": "reference\\matlab\\vV.csv",
+      "a_x": "reference\\matlab\\a_x.csv",
+      "a_y": "reference\\matlab\\a_y.csv"
+    },
+    "metadata": "reference\\matlab\\result.json"
+  },
+  "tolerances": {
+    "eta_max_abs_err": 1E-6,
+    "phi_max_abs_err": 1E-6,
+    "eta_rms_err": 1E-7,
+    "phi_rms_err": 1E-7,
+    "eta_relative_l2_err": 1E-6,
+    "phi_relative_l2_err": 1E-6,
+    "u_max_abs_err": 1E-6,
+    "v_max_abs_err": 1E-6,
+    "w_max_abs_err": 1E-6,
+    "p_max_abs_err": 1E-6,
+    "phi_vol_max_abs_err": 1E-6,
+    "uV_max_abs_err": 1E-6,
+    "vV_max_abs_err": 1E-6,
+    "a_x_max_abs_err": 1E-6,
+    "a_y_max_abs_err": 1E-6
+  }
+}

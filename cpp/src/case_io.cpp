@@ -120,6 +120,11 @@ CaseManifest load_manifest(const std::filesystem::path& case_dir) {
   manifest.inputs.Nx = extract_int(inputs, "Nx");
   manifest.inputs.Ny = extract_int(inputs, "Ny");
   manifest.inputs.t = extract_number(inputs, "t");
+  try {
+    manifest.inputs.z_kinematics = extract_number(inputs, "z_kinematics");
+  } catch (const std::exception&) {
+    manifest.inputs.z_kinematics = 0.0;
+  }
   manifest.inputs.subharmonic_mode = extract_string(inputs, "subharmonic_mode");
 
   manifest.arrays = extract_path_map(extract_section(text, "arrays"));
@@ -223,6 +228,16 @@ bool validate_case(const LoadedCase& loaded, std::string* error_message) {
   }
   if (y->values.size() != static_cast<std::size_t>(loaded.manifest.inputs.Ny)) {
     return fail("y axis length does not match Ny.");
+  }
+
+  const char* kinematic_names[] = {"u", "v", "w", "p", "phi_vol", "uV", "vV", "a_x", "a_y"};
+  for (const char* name : kinematic_names) {
+    const Matrix* mat = find_array(loaded.reference_arrays, name);
+    if (mat != nullptr) {
+      if (mat->rows != eta->rows || mat->cols != eta->cols) {
+        return fail(std::string(name) + " dimensions do not match eta.");
+      }
+    }
   }
   return true;
 }

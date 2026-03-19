@@ -1,0 +1,17 @@
+{
+  "case_id": "benchmark_dense_100",
+  "runtime": {
+    "repeats": 1,
+    "mean_coefficient_s": 0.397637,
+    "mean_reconstruction_s": 0.3096825,
+    "mean_kinematics_s": 67.2913467,
+    "mean_total_s": 67.9986662,
+    "best_total_s": 67.9986662
+  },
+  "metadata": {
+    "language": "matlab",
+    "matlab_version": "9.13.0.2698988 (R2022b) Update 10",
+    "fft_backend": "MATLAB ifft2",
+    "implementation": "mf12_spectral_coefficients + mf12_spectral_surface + mf12_spectral_kinematics"
+  }
+}

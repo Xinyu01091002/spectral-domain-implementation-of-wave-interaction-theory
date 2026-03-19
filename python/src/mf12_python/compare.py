@@ -22,6 +22,10 @@ def compare_result_to_reference(result: dict[str, Any], case: dict[str, Any]) ->
     metrics: dict[str, float] = {}
     metrics.update(compare_fields(result["eta"], reference["eta"], "eta"))
     metrics.update(compare_fields(result["phi"], reference["phi"], "phi"))
+    if "kinematics" in result:
+        for name, values in result["kinematics"].items():
+            if name in reference:
+                metrics.update(compare_fields(values, reference[name], name))
 
     ref_meta = case["reference"].get("loaded_metadata", {})
     matlab_runtime = ref_meta.get("runtime", {})

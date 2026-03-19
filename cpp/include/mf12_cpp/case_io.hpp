@@ -24,6 +24,7 @@ struct CaseInputs {
   int Nx = 0;
   int Ny = 0;
   double t = 0.0;
+  double z_kinematics = 0.0;
   std::string subharmonic_mode;
 };
 

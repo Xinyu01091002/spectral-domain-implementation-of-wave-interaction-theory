@@ -2,15 +2,16 @@
   "case_id": "benchmark_medium",
   "runtime": {
     "repeats": 3,
-    "mean_coefficient_s": 0.020078833333333334,
-    "mean_reconstruction_s": 0.0119759,
-    "mean_total_s": 0.032054733333333335,
-    "best_total_s": 0.02175
+    "mean_coefficient_s": 0.011668900000000001,
+    "mean_reconstruction_s": 0.010745866666666666,
+    "mean_kinematics_s": 3.0439003666666671,
+    "mean_total_s": 3.0663151333333332,
+    "best_total_s": 3.0448831
   },
   "metadata": {
     "language": "matlab",
     "matlab_version": "9.13.0.2698988 (R2022b) Update 10",
     "fft_backend": "MATLAB ifft2",
-    "implementation": "mf12_spectral_coefficients + mf12_spectral_surface"
+    "implementation": "mf12_spectral_coefficients + mf12_spectral_surface + mf12_spectral_kinematics"
   }
 }

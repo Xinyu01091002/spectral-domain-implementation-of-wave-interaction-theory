@@ -66,8 +66,8 @@ More specifically:
 
 - MATLAB direct and spectral workflows are the reference implementation.
 - MATLAB direct-vs-spectral verification now covers both surface reconstruction and constant-z kinematics reconstruction to machine precision on the retained verification cases.
-- Python matches MATLAB on the shared spectral cases to machine precision.
-- C++ matches MATLAB on the shared spectral cases to machine precision.
+- Python matches MATLAB on the shared spectral cases, including constant-z kinematics, to machine precision.
+- C++ matches MATLAB on the shared spectral cases, including constant-z kinematics, to machine precision.
 - Python and C++ currently target the shared spectral workflow rather than the MATLAB direct physical-space path.
 - the MATLAB coefficient and reconstruction workflow in this repository follows and is verified against the DTU MATLAB release by David R. Fuhrman
 - Shared regression cases currently include:
@@ -216,7 +216,17 @@ In MATLAB:
 run('matlab/repro/export_cross_language_cases.m');
 ```
 
-This writes shared deterministic cases under [cross_language_comparison/cases](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cross_language_comparison/cases).
+This writes shared deterministic cases under [cross_language_comparison/cases](C:/Research/spectral%20domain%20implementation%20of%20wave%20interaction%20theory/cross_language_comparison/cases), including MATLAB references for `eta`, surface `phi`, and constant-z kinematics:
+
+- `u`
+- `v`
+- `w`
+- `p`
+- `phi_vol`
+- `uV`
+- `vV`
+- `a_x`
+- `a_y`
 
 ### 2. Verify Python or C++ against MATLAB
 
@@ -250,7 +260,7 @@ Each shared case folder contains:
 
 - `case.json`: scalar inputs, metadata, file paths, and tolerances
 - `inputs/*.csv`: input arrays such as `a`, `b`, `kx`, and `ky`
-- `reference/matlab/*.csv`: MATLAB reference `eta`, `phi`, `x`, and `y`
+- `reference/matlab/*.csv`: MATLAB reference `eta`, `phi`, `x`, `y`, and constant-z kinematics arrays
 - `reference/matlab/result.json`: MATLAB runtime metadata
 
 For the wave-group line-comparison figures, MATLAB component references are also archived under:

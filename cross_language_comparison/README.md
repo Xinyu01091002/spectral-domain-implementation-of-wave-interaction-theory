@@ -6,9 +6,9 @@ MATLAB remains the numerical ground truth. Python and C++ consume the same archi
 
 ## Current Status
 
-- `minimal_small` matches MATLAB at machine precision
-- `wavegroup_regression` matches MATLAB at machine precision for both `eta` and `phi`
-- `benchmark_medium` matches MATLAB at machine precision for both `eta` and `phi`
+- `minimal_small` matches MATLAB at machine precision for surface and constant-z kinematics
+- `wavegroup_regression` matches MATLAB at machine precision for surface and constant-z kinematics
+- `benchmark_medium` matches MATLAB at machine precision for surface and constant-z kinematics
 - `benchmark_dense_300` and `benchmark_dense_600` are available as larger retained-component benchmark cases
 
 ## Folder Structure
@@ -81,7 +81,7 @@ Each shared case folder contains:
 
 - `case.json`: scalar inputs, file references, metadata, and tolerances
 - `inputs/*.csv`: `a`, `b`, `kx`, and `ky`
-- `reference/matlab/*.csv`: MATLAB `eta`, `phi`, `x`, and `y`
+- `reference/matlab/*.csv`: MATLAB `eta`, `phi`, `x`, `y`, and constant-z kinematics arrays
 - `reference/matlab/result.json`: MATLAB runtime metadata
 
 Python and C++ verification outputs both write the same result bundle shape:
@@ -90,6 +90,15 @@ Python and C++ verification outputs both write the same result bundle shape:
 - `phi.csv`
 - `x.csv`
 - `y.csv`
+- `u.csv`
+- `v.csv`
+- `w.csv`
+- `p.csv`
+- `phi_vol.csv`
+- `uV.csv`
+- `vV.csv`
+- `a_x.csv`
+- `a_y.csv`
 - `result.json`
 
 The comparison metrics reported today are:
@@ -97,6 +106,8 @@ The comparison metrics reported today are:
 - `eta_max_abs_err`, `phi_max_abs_err`
 - `eta_rms_err`, `phi_rms_err`
 - `eta_relative_l2_err`, `phi_relative_l2_err`
+- `u_max_abs_err`, `v_max_abs_err`, `w_max_abs_err`, `p_max_abs_err`
+- `phi_vol_max_abs_err`, `uV_max_abs_err`, `vV_max_abs_err`, `a_x_max_abs_err`, `a_y_max_abs_err`
 - `speedup_vs_matlab_total`
 - `speedup_vs_matlab_reconstruction`
 
